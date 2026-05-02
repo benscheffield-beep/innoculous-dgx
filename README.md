@@ -1,6 +1,6 @@
 # Innoculus — Deployment Reference & Verification Guide
 
-**Audience:** This document is written for an AI code reviewer (Claude or equivalent) acting as a deployment verification overseer. Every section is intended to be read programmatically and reasoned over. All technical claims are derived directly from the source algorithm documents and existing codebase. No placeholder content appears here.
+**Audience:** This document is written for an AI code reviewer (Claude or equivalent) acting as a deployment verification overseer. Every section is intended to be read programmatically and reasoned over. Technical claims sourced from the current codebase are labeled **[current]**. Claims sourced from the three algorithm specification documents (Editor pseudocode, Verifier JSON spec, Manager PDR) but not yet implemented are labeled **[spec/planned]**. Shell examples use `$HOST` and `$JOB_ID` as substitution variables.
 
 ---
 
@@ -43,7 +43,7 @@ The application stack:
 | Validation | Zod v4, drizzle-zod |
 | API codegen | Orval (from OpenAPI spec) |
 | Build | esbuild → ESM bundle (`dist/index.mjs`) |
-| Frontend | React + Vite (artifact slug: `innoculus`, created in Task #2) |
+| Frontend | React + Vite **[spec/planned]** — not yet in the repo; frontend artifact to be scaffolded |
 
 ---
 
@@ -188,7 +188,7 @@ All routes are mounted under `/api`. The base OpenAPI spec lives at `lib/api-spe
 |---|---|---|
 | `GET` | `/api/healthz` | Health check — returns `{ status: string }` |
 
-### Planned (Task #1 — Innoculus backend pipeline)
+### Planned — Backend Pipeline **[spec/planned]**
 
 #### Job Management (Manager)
 
@@ -221,7 +221,7 @@ All routes are mounted under `/api`. The base OpenAPI spec lives at `lib/api-spe
 **ORM:** Drizzle ORM (`lib/db/src/schema/index.ts`)
 **Database:** PostgreSQL
 
-Schema is not yet implemented (planned in Task #1). The following tables are required:
+Schema is not yet implemented **[spec/planned]**. The following tables are required:
 
 ### `jobs`
 
@@ -388,12 +388,12 @@ Policy thresholds are submitted per-job in the `policy_config` field of `POST /a
 | `VERIFIER_SIGNING_KEY` | Yes | Secret key for HMAC-SHA256 artifact signing (maps to `verifier_key_id`) |
 | `PORT` | Yes | Port for the API server (assigned by Replit at runtime) |
 | `NODE_ENV` | Yes | `production` for deployed environment |
-| `DEFAULT_SPECTRAL_RADIUS_MAX` | No | Override global default (default: `0.999`) |
-| `DEFAULT_COND_LIMIT` | No | Override global default (default: `1e6`) |
-| `DEFAULT_DUAL_ERROR_TOL` | No | Override global default (default: `1e-6`) |
-| `DEFAULT_SPECTRAL_TAIL_TOL` | No | Override global default (default: `1e-6`) |
-| `JOB_TIMEOUT_MS` | No | Per-job execution timeout in ms (default: `300000`) |
-| `MAX_CONCURRENT_JOBS` | No | Concurrent pipeline limit (target: ≥ 50) |
+| `DEFAULT_SPECTRAL_RADIUS_MAX` | No | **[spec/planned]** Override global policy default for spectral radius check |
+| `DEFAULT_COND_LIMIT` | No | **[spec/planned]** Override global policy default for condition number check |
+| `DEFAULT_DUAL_ERROR_TOL` | No | **[spec/planned]** Override global policy default for dual truncation error check |
+| `DEFAULT_SPECTRAL_TAIL_TOL` | No | **[spec/planned]** Override global policy default for spectral tail check |
+| `JOB_TIMEOUT_MS` | No | **[spec/planned]** Per-job execution timeout in ms; required by Manager PDR |
+| `MAX_CONCURRENT_JOBS` | No | **[spec/planned]** Concurrent pipeline cap; Manager PDR target is ≥ 50 |
 
 ### Database
 
@@ -419,8 +419,8 @@ Policy thresholds are submitted per-job in the `policy_config` field of `POST /a
 4. Run `pnpm --filter @workspace/api-spec run codegen` — must complete without errors
 5. Run `pnpm --filter @workspace/db run push` — applies schema to production database
 6. Run `pnpm --filter @workspace/api-server run build` — produces ESM bundle at `artifacts/api-server/dist/index.mjs`
-7. Start the API server: `pnpm --filter @workspace/api-server run start`
-8. Build and serve the frontend (artifact slug created in Task #2): `pnpm --filter @workspace/<innoculus-slug> run build` then serve the static output directory
+7. Start the API server: `pnpm --filter @workspace/api-server run start` **[current — runs `node --enable-source-maps ./dist/index.mjs`]**
+8. **[spec/planned]** Build and serve the React frontend once its artifact is scaffolded: `pnpm --filter @workspace/<frontend-slug> run build` then serve the resulting `dist/` directory. The correct package name is determined when the frontend artifact is created.
 
 ### Health Check Endpoint
 
@@ -433,12 +433,14 @@ This endpoint must respond within 2 seconds for the deployment to be considered 
 
 ### Smoke Tests Post-Deployment
 
-```
-# 1. Health
-curl -f https://<host>/api/healthz
+The commands below use shell substitution variables (`$HOST` = deployed hostname, `$JOB_ID` = UUID returned by the create call). These are parameterized examples; substitute real values before running.
 
-# 2. Create a job (minimal synthetic kernel)
-curl -X POST https://<host>/api/jobs \
+```sh
+# 1. Health  [current endpoint]
+curl -f "https://$HOST/api/healthz"
+
+# 2. Create a job with a minimal synthetic Gaussian kernel  [spec/planned endpoint]
+curl -X POST "https://$HOST/api/jobs" \
   -H "Content-Type: application/json" \
   -d '{
     "kernel": { "type": "gaussian", "sigma": 1.0 },
@@ -448,8 +450,8 @@ curl -X POST https://<host>/api/jobs \
     "precision": { "b": 32, "tol": 1e-6 }
   }'
 
-# 3. Poll until complete or failed (replace <job_id>)
-curl https://<host>/api/jobs/<job_id>
+# 3. Poll for final status  [spec/planned endpoint]
+curl "https://$HOST/api/jobs/$JOB_ID"
 ```
 
 ---
@@ -461,7 +463,7 @@ The following items are explicitly out of scope for the initial deployment:
 | Item | Rationale |
 |---|---|
 | Authentication and user accounts | Planned as a follow-up task |
-| Real GPU / distributed numerical compute | Editor runs in-process on Node using math.js; no GPU acceleration |
+| Real GPU / distributed numerical compute | Editor runs in-process on Node; no GPU acceleration. Specific numerical library is chosen during implementation. |
 | External LLM/AGI model inference | No external model calls in v1; `model_pool` is optional and defaults to a synthetic basis |
 | WebSocket real-time streaming | Job status is delivered via client polling (`GET /api/jobs/:id`); WebSocket upgrade is deferred |
 | Export (PDF, CSV) | Not implemented in v1 |
