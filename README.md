@@ -24,7 +24,7 @@
 
 ## 1. Project Overview
 
-Innoculus is a full-stack application that exposes a multi-agent numerical computation pipeline to both non-technical users and technical developers. Its core purpose is to provide accessible, interactive capacity with advanced agents aligned to superintelligence/AGI principles.
+Innoculus is a full-stack application that exposes a multi-agent numerical computation pipeline to both non-technical users and technical developers. Its core pipeline implements a spectral self-force computation: a kernel-based absorber fixed-point solve followed by rigorous numerical verification, accessible through a dual-mode interface (simplified user view and full developer diagnostics view).
 
 The pipeline is composed of three coordinated subagents:
 
@@ -37,13 +37,13 @@ The application stack:
 | Layer | Technology |
 |---|---|
 | Monorepo tool | pnpm workspaces |
-| Runtime | Node.js 24 |
+| Runtime | Node.js 24 (per `replit.md`) |
 | API framework | Express 5 |
 | Database | PostgreSQL + Drizzle ORM |
 | Validation | Zod v4, drizzle-zod |
 | API codegen | Orval (from OpenAPI spec) |
-| Build | esbuild (CJS bundle) |
-| Frontend | React + Vite |
+| Build | esbuild → ESM bundle (`dist/index.mjs`) |
+| Frontend | React + Vite (artifact slug: `innoculus`, created in Task #2) |
 
 ---
 
@@ -418,9 +418,9 @@ Policy thresholds are submitted per-job in the `policy_config` field of `POST /a
 3. Run `pnpm run typecheck` — must exit 0
 4. Run `pnpm --filter @workspace/api-spec run codegen` — must complete without errors
 5. Run `pnpm --filter @workspace/db run push` — applies schema to production database
-6. Run `pnpm --filter @workspace/api-server run build` — produces CJS bundle
-7. Start the API server: `pnpm --filter @workspace/api-server run serve`
-8. Start the frontend: `pnpm --filter @workspace/innoculus run build` then serve static output
+6. Run `pnpm --filter @workspace/api-server run build` — produces ESM bundle at `artifacts/api-server/dist/index.mjs`
+7. Start the API server: `pnpm --filter @workspace/api-server run start`
+8. Build and serve the frontend (artifact slug created in Task #2): `pnpm --filter @workspace/<innoculus-slug> run build` then serve the static output directory
 
 ### Health Check Endpoint
 
@@ -525,12 +525,19 @@ The following checklist is structured for a Claude LLM reviewer to execute step-
 - [ ] **G2** — Confirm `job_artifacts.hash` and `job_artifacts.signed_proof` columns exist with correct types (`text`, nullable for `signed_proof`).
 - [ ] **G3** — Confirm foreign key constraints are present: `job_artifacts.job_id → jobs.id` and `job_diagnostics.artifact_id → job_artifacts.id`.
 
-### H. Deployment Health
+### H. Resource Isolation Between Pipeline Jobs
 
-- [ ] **[BLOCKING] H1** — `GET /api/healthz` returns `200 { "status": "ok" }` within 2 seconds from the deployed host.
-- [ ] **[BLOCKING] H2** — The smoke test job (Section 11) creates a job, advances to `complete` or `complete_with_warnings`, and the returned artifact contains non-null `Phi_coeffs` and `R_coeffs`.
-- [ ] **H3** — No `ERROR` level log lines appear in the API server output during the smoke test.
-- [ ] **H4** — Confirm `NODE_ENV=production` is set. Development-only cache-control overrides must not be active in production (see `artifacts/api-server/src/app.ts`).
+- [ ] **[BLOCKING] H1** — Confirm that concurrent pipeline jobs cannot access or corrupt each other's in-progress artifacts. Verify that artifact reads and writes are always scoped by `job_id` at the query level, with no cross-job shared mutable state in the Editor or Verifier workers.
+- [ ] **H2** — Confirm there is a mechanism (e.g. per-job timeouts, `MAX_CONCURRENT_JOBS` cap) that prevents a single long-running numerical solve from exhausting server resources and starving other jobs (the Manager PDR requires resource isolation to avoid "noisy neighbors").
+- [ ] **H3** — Confirm numerical tasks (Editor pipeline steps 4, 8) do not block the Node.js event loop indefinitely. Long synchronous compute must either be offloaded (worker threads, child process) or guarded with a per-job timeout that triggers the `failed` state transition.
+
+### I. Deployment Health
+
+- [ ] **[BLOCKING] I1** — `GET /api/healthz` returns `200 { "status": "ok" }` within 2 seconds from the deployed host.
+- [ ] **[BLOCKING] I2** — The smoke test job (Section 11) creates a job, advances to `complete` or `complete_with_warnings`, and the returned artifact contains non-null `Phi_coeffs` and `R_coeffs`.
+- [ ] **I3** — No `ERROR` level log lines appear in the API server output during the smoke test.
+- [ ] **I4** — Confirm `NODE_ENV=production` is set. Development-only overrides must not be active in production (see `artifacts/api-server/src/app.ts`).
+- [ ] **I5** — Confirm the API server starts with `pnpm --filter @workspace/api-server run start` (which runs `node --enable-source-maps ./dist/index.mjs`) and that `dist/index.mjs` exists after the build step. The `dev` script (`build` + `start`) must not be used in production.
 
 ---
 
