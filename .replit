@@ -26,3 +26,8 @@ externalPort = 8080
 [[ports]]
 localPort = 8081
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+ANTHROPIC_API_KEY = "03-0-bkvFszF_9Qj07Bxp2HfCj-CMANfnvdZ7ii7QkmmaYGKDfe9Bcd3G_HO5bakj-dDdMLtkprQ48jbtKuOgS2Xg-PY8poAAA"
