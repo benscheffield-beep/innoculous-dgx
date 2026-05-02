@@ -229,12 +229,14 @@ function solveWithFallback(A: Matrix, b: Vec, _tol: number): Vec {
     return matVec(Ainv, b);
   } catch {
     const n = A.length;
-    const result = new Vec(n).fill(0);
-    const reg = A.map((row, i) => row.map((v, j) => v + (i === j ? 1e-8 : 0)));
+    const fallback: Vec = new Array(n).fill(0) as Vec;
+    const reg: Matrix = A.map((row, i) =>
+      row.map((v, j) => v + (i === j ? 1e-8 : 0))
+    );
     try {
       return matVec(matInverse(reg), b);
     } catch {
-      return result;
+      return fallback;
     }
   }
 }

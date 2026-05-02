@@ -30,8 +30,24 @@ export interface VerifierResult {
   signed_proof: string;
 }
 
+function deepCanonical(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "null";
+  if (typeof value === "boolean" || typeof value === "number") return JSON.stringify(value);
+  if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return "[" + value.map(deepCanonical).join(",") + "]";
+  }
+  if (typeof value === "object") {
+    const sorted = Object.keys(value as Record<string, unknown>).sort();
+    const pairs = sorted.map(k => `${JSON.stringify(k)}:${deepCanonical((value as Record<string, unknown>)[k])}`);
+    return "{" + pairs.join(",") + "}";
+  }
+  return JSON.stringify(value);
+}
+
 function computeArtifactHash(payload: ArtifactPayload): string {
-  const canonical = JSON.stringify(payload, Object.keys(payload).sort());
+  const canonical = deepCanonical(payload);
   return createHash("sha256").update(canonical).digest("hex");
 }
 
