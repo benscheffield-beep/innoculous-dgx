@@ -43,7 +43,7 @@ The application stack:
 | Validation | Zod v4, drizzle-zod |
 | API codegen | Orval (from OpenAPI spec) |
 | Build | esbuild → ESM bundle (`dist/index.mjs`) |
-| Frontend | React + Vite **[spec/planned]** — not yet in the repo; frontend artifact to be scaffolded |
+| Frontend | React + Vite **[spec/planned]** — production UI not yet scaffolded. Note: `artifacts/mockup-sandbox` exists as a design/canvas prototyping sandbox and is not the production frontend. |
 
 ---
 
@@ -384,10 +384,10 @@ Policy thresholds are submitted per-job in the `policy_config` field of `POST /a
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `VERIFIER_SIGNING_KEY` | Yes | Secret key for HMAC-SHA256 artifact signing (maps to `verifier_key_id`) |
-| `PORT` | Yes | Port for the API server (assigned by Replit at runtime) |
-| `NODE_ENV` | Yes | `production` for deployed environment |
+| `DATABASE_URL` | Yes | **[spec/planned]** PostgreSQL connection string — enforced by DB layer once schema is implemented |
+| `VERIFIER_SIGNING_KEY` | Yes | **[spec/planned]** Secret key for HMAC-SHA256 artifact signing — enforced by Verifier worker once implemented |
+| `PORT` | Yes | **[current]** Port for the API server — enforced at startup in `artifacts/api-server/src/index.ts` (throws if unset) |
+| `NODE_ENV` | Yes | **[current]** Required by Express and pino-http for production behaviour |
 | `DEFAULT_SPECTRAL_RADIUS_MAX` | No | **[spec/planned]** Override global policy default for spectral radius check |
 | `DEFAULT_COND_LIMIT` | No | **[spec/planned]** Override global policy default for condition number check |
 | `DEFAULT_DUAL_ERROR_TOL` | No | **[spec/planned]** Override global policy default for dual truncation error check |
@@ -507,7 +507,7 @@ The following checklist is structured for a Claude LLM reviewer to execute step-
 - [ ] **[BLOCKING] D1** — Confirm the `VERIFIER_SIGNING_KEY` environment variable is set in the deployment environment and is not the empty string.
 - [ ] **[BLOCKING] D2** — Confirm the signing key is never hardcoded in source code. Search for literal strings matching the key value in all source files.
 - [ ] **D3** — Confirm there is a documented procedure for rotating `VERIFIER_SIGNING_KEY` (note: automated rotation is out of scope for v1, but the procedure must be documented).
-- [ ] **D4** — Confirm that artifacts signed with an old key are invalidated (CHK01 will fail) after rotation, not silently accepted.
+- [ ] **D4** — Confirm that after key rotation, artifacts signed with the old key fail signature validation (not CHK01 hash integrity, which only checks payload hash). The signature verification step must reject any `signed_proof` whose HMAC does not match the current `VERIFIER_SIGNING_KEY`, and the artifact must not be silently re-accepted without re-running the Verifier.
 
 ### E. Idempotency and Retry Safety
 
