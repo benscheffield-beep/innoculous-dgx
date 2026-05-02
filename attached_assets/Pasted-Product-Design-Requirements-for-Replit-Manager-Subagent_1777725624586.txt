@@ -1,0 +1,40 @@
+Product Design Requirements for Replit Manager Subagent
+Purpose
+Manage orchestration of the multi‑agent pipeline: schedule agents, route artifacts, enforce invariants, collect diagnostics, and expose a compact API to the editor and verifier subagents.
+Primary responsibilities
+• Orchestration: start/stop agents, route messages, manage retries.
+• State management: persist intermediate artifacts and metadata.
+• Policy enforcement: enforce truncation, privacy, and stability thresholds.
+• Observability: collect logs, metrics, and health signals.
+• API gateway: provide REST/IPC endpoints for Editor and Verifier.
+Inputs
+• Task descriptor: job id, kernel parameters, lattice geometry, truncation targets.
+• Agent outputs: dual coefficients, spectral basis, absorber matrix, diagnostics.
+• User controls: tolerances, compute budget, register bit target.
+Outputs
+• Work items for Editor and Self‑Force agents.
+• Aggregated diagnostics: spectral radius, condition numbers, error bounds.
+• Final artifacts: compressed spectral coefficients, self‑force vector, provenance.
+Functional requirements
+• Idempotent task scheduling with unique job ids.
+• Guaranteed delivery semantics for messages between agents.
+• Versioned artifact store with immutable snapshots.
+• Configurable timeouts and backoff for numerical solvers.
+• Pluggable policy hooks for precision, privacy, and resource limits.
+Nonfunctional requirements
+• Latency: orchestration decision latency < 200 ms for control messages.
+• Throughput: support concurrent pipelines ≥ 50 jobs.
+• Reliability: 99.9% availability for control plane.
+• Security: role‑based access, artifact encryption at rest and in transit.
+• Resource isolation: sandbox numerical tasks to avoid noisy neighbors.
+Interfaces and contracts
+• Manager → Editor: POST /jobs/{id}/work with JSON {kernel, Q, truncation, seed}.
+• Editor → Manager: PATCH /jobs/{id}/status and PUT /jobs/{id}/artifact with signed metadata.
+• Manager → Verifier: POST /jobs/{id}/verify with artifact pointers and diagnostics.
+• Verifier → Manager: POST /jobs/{id}/verdict with pass/fail and remediation steps.
+Validation and tests
+• Unit tests for routing, retry, and idempotency.
+• Integration tests with synthetic kernels to validate end‑to‑end numerical stability.
+• Fuzz tests for malformed artifacts and adversarial inputs.
+• Performance tests for concurrency and latency SLAs.
+---

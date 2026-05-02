@@ -1,0 +1,71 @@
+# Editor Subagent Pseudocode
+# Responsibilities: compute dual coefficients, perform Poisson transform,
+# prepare absorber inputs, project to spectral basis, and upload artifacts.
+
+def editor_main(job_descriptor):
+    # 1. Load job parameters
+    kernel_params = job_descriptor['kernel']
+    Q = job_descriptor['Q']
+    truncation = job_descriptor['truncation']  # {M, r}
+    latency_params = job_descriptor['latency']  # {lambda, delta, Tnow}
+    precision_cfg = job_descriptor['precision']  # {b, tol}
+
+    # 2. Precompute Gaussian/Mellin kernel k0(t)
+    k0 = build_k0(kernel_params)
+
+    # 3. Build full kernel K(t) = (1 - exp(-lambda*(t-Tnow+delta))) * k0(t)
+    K = lambda t: (1 - exp(-latency_params['lambda']*(t - latency_params['Tnow'] + latency_params['delta']))) * k0(t)
+
+    # 4. Compute theta function via Poisson summation for dual indices ||mu|| <= M
+    dual_indices = enumerate_dual_indices(truncation['M'], Q)
+    F = {}
+    for mu in dual_indices:
+        # numerical integral: F(mu) = ∫_0^∞ K(t) t^{-d/2} exp(-π mu^T Q^{-1} mu / t) dt
+        F[mu] = integrate_t(K, mu, Q, precision_cfg['tol'])
+
+    # 5. Regularize zero mode and compute singular expansion coefficients a_n
+    a = compute_short_time_coefficients(k0, latency_params)
+    F_const, F_exp = split_F(F, a)
+
+    # 6. Prepare absorber coupling matrix G_off for truncated dual set
+    G_off = build_absorber_matrix(dual_indices, kernel_params, Q, precision_cfg)
+
+    # 7. Compute Dirac symmetric subtraction S_mu = lim_{ε→0} (F - F_sym)
+    S = {}
+    for mu in dual_indices:
+        F_sym = compute_symmetric_part(mu, a, Q)
+        S[mu] = regularize_limit(F[mu], F_sym)
+
+    # 8. Solve absorber fixed point: Phi = (I - G_off)^{-1} S
+    if spectral_radius(G_off) >= 1 - precision_cfg.get('safety_margin', 1e-3):
+        apply_damping(G_off)
+    Phi = solve_linear_system(I_minus(G_off), S, tol=precision_cfg['tol'])
+
+    # 9. Compute radiation reaction R = Phi - F_ret (retarded integral)
+    F_ret = compute_retarded_part(F, kernel_params)
+    R = {mu: Phi[mu] - F_ret[mu] for mu in dual_indices}
+
+    # 10. Project Phi and R onto top r spectral modes (universal subspace)
+    U, lambdas = compute_spectral_basis_from_models(job_descriptor.get('model_pool'), r=truncation['r'])
+    coeffs_Phi = project_to_basis(Phi, U)
+    coeffs_R = project_to_basis(R, U)
+
+    # 11. Package artifacts and diagnostics
+    artifact = {
+        'dual_indices': dual_indices,
+        'F': serialize_sparse(F),
+        'S': serialize_sparse(S),
+        'Phi_coeffs': coeffs_Phi,
+        'R_coeffs': coeffs_R,
+        'U_meta': metadata(U, lambdas),
+        'diagnostics': {
+            'spectral_radius': spectral_radius(G_off),
+            'cond_I_minus_G': condition_number(I_minus(G_off)),
+            'dual_truncation_error': estimate_dual_error(F, truncation['M']),
+            'spectral_tail_error': estimate_spectral_tail(lambdas, truncation['r'])
+        }
+    }
+
+    # 12. Upload artifact to Manager and mark job step complete
+    upload_artifact(job_descriptor['job_id'], artifact)
+    notify_manager_status(job_descriptor['job_id'], status='editor_complete', artifact_ref=artifact['id'])

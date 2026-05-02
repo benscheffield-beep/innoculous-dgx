@@ -1,0 +1,87 @@
+{
+  "name": "verifier-subagent",
+  "version": "1.0",
+  "purpose": "Numerical and policy verification of artifacts produced by Editor and Manager",
+  "capabilities": [
+    "validate_artifact_integrity",
+    "recompute_key_numerics",
+    "check_stability_and_safety",
+    "produce_verdict_and_remediation"
+  ],
+  "inputs": {
+    "artifact_ref": "pointer to stored artifact (dual coefficients, Phi_coeffs, R_coeffs, U_meta, diagnostics)",
+    "policy_config": "thresholds for spectral_radius, cond_limit, dual_error_tol, spectral_tail_tol"
+  },
+  "outputs": {
+    "verdict": "pass | warn | fail",
+    "issues": "list of detected problems with severity and remediation",
+    "recomputed_metrics": "spectral_radius, cond_number, dual_error_estimate, spectral_tail_estimate",
+    "signed_proof": "cryptographic hash and signature of verified artifact"
+  },
+  "checks": [
+    {
+      "id": "CHK01",
+      "name": "artifact_integrity",
+      "description": "Verify artifact hash matches stored snapshot",
+      "severity": "fail"
+    },
+    {
+      "id": "CHK02",
+      "name": "spectral_radius_check",
+      "description": "Ensure spectral_radius < policy.spectral_radius_max",
+      "severity": "fail"
+    },
+    {
+      "id": "CHK03",
+      "name": "condition_number_check",
+      "description": "Ensure cond(I - G_off) < policy.cond_limit",
+      "severity": "warn"
+    },
+    {
+      "id": "CHK04",
+      "name": "dual_truncation_error_check",
+      "description": "Ensure dual_truncation_error <= policy.dual_error_tol",
+      "severity": "warn"
+    },
+    {
+      "id": "CHK05",
+      "name": "spectral_tail_check",
+      "description": "Ensure spectral_tail_estimate <= policy.spectral_tail_tol",
+      "severity": "warn"
+    },
+    {
+      "id": "CHK06",
+      "name": "causality_check",
+      "description": "Verify retarded vs advanced decomposition and i0 prescription applied",
+      "severity": "fail"
+    },
+    {
+      "id": "CHK07",
+      "name": "privacy_check",
+      "description": "Ensure no sensitive tokens or raw user data embedded in artifacts",
+      "severity": "fail"
+    }
+  ],
+  "remediation_actions": {
+    "fail": [
+      "reject_artifact_and_request_recompute",
+      "increase_regulator_epsilon",
+      "reduce_truncation_radius_M",
+      "apply_damping_to_G_off"
+    ],
+    "warn": [
+      "recommend_increase_r",
+      "recommend_increase_b",
+      "log_and_proceed_with_caution"
+    ]
+  },
+  "performance": {
+    "max_runtime_seconds": 120,
+    "parallel_checks": true
+  },
+  "security": {
+    "signing_key": "verifier_key_id",
+    "access_control": ["manager", "auditor"],
+    "audit_log": true
+  }
+}
