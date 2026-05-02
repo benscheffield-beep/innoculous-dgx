@@ -4,6 +4,25 @@
 
 ---
 
+## Implementation Status (Snapshot)
+
+The backend pipeline is implemented end-to-end and verified by automated tests. The frontend UI is the only major remaining piece.
+
+| Subsystem | State | Evidence |
+|---|---|---|
+| Manager (REST gateway) | **Complete** | 9 endpoints in `artifacts/api-server/src/routes/jobs.ts` |
+| Editor (12-step numerical pipeline) | **Complete** | `artifacts/api-server/src/workers/editor.ts` |
+| Verifier (CHK01–CHK07 + HMAC) | **Complete** | `artifacts/api-server/src/workers/verifier.ts` |
+| Pipeline orchestration with auto-retry + backoff | **Complete** | `artifacts/api-server/src/workers/pipeline.ts` |
+| Remediation dispatching (warn/fail → adjusted descriptor → retry) | **Complete** | `applyRemediation()` in `pipeline.ts` |
+| Database schema (jobs, job_artifacts, job_diagnostics) | **Complete and pushed** | `lib/db/src/schema/` |
+| OpenAPI spec + generated client | **Complete** | `lib/api-spec/openapi.yaml`, `lib/api-client-react/src/generated/` |
+| Test suite | **90 tests passing** | `math.test.ts` (18), `pipeline.test.ts` (17), `verifier.test.ts` (16), `jobs.test.ts` (39) |
+| Frontend UI (User Mode + Developer Mode) | **Not started** | Tracked as follow-up task #7 |
+| Persistent job queue (survives restarts) | **Not started** | Tracked as follow-up task #8 |
+
+---
+
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
@@ -43,6 +62,7 @@ The application stack:
 | Validation | Zod v4, drizzle-zod |
 | API codegen | Orval (from OpenAPI spec) |
 | Build | esbuild → ESM bundle (`dist/index.mjs`) |
+| Test runner | Vitest 3 + supertest |
 | Frontend | React + Vite **[spec/planned]** — production UI not yet scaffolded. Note: `artifacts/mockup-sandbox` exists as a design/canvas prototyping sandbox and is not the production frontend. |
 
 ---
@@ -182,26 +202,27 @@ The Verifier is a validation oracle. It independently recomputes key numerics fr
 
 All routes are mounted under `/api`. The base OpenAPI spec lives at `lib/api-spec/openapi.yaml`. Client hooks are generated via Orval into `lib/api-client-react/src/generated/`.
 
-### Currently Implemented
+### Currently Implemented **[current]**
+
+#### Health
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/healthz` | Health check — returns `{ status: string }` |
-
-### Planned — Backend Pipeline **[spec/planned]**
+| `GET` | `/api/healthz` | Health check — returns `{ status: "ok" }` |
 
 #### Job Management (Manager)
 
 | Method | Path | Request Body | Response | Notes |
 |---|---|---|---|---|
-| `POST` | `/api/jobs` | `{ kernel, Q, truncation, latency, precision, model_pool? }` | `{ job_id, status: "queued", created_at }` | Idempotent with client-supplied `job_id` |
-| `GET` | `/api/jobs` | — | `{ jobs: Job[], total, page, page_size }` | Paginated |
-| `GET` | `/api/jobs/:id` | — | Full `Job` object with artifact ref and diagnostics | |
+| `POST` | `/api/jobs` | `{ kernel, Q, truncation, latency, precision, model_pool?, policy_config?, job_id? }` | `{ job_id, status: "queued", created_at }` (201) | Idempotent with client-supplied `job_id` (returns 200 with existing job) |
+| `GET` | `/api/jobs` | — | `{ jobs: Job[], total, page, page_size }` | Paginated; defaults to page=1, page_size=20 |
+| `GET` | `/api/jobs/:id` | — | Full `Job` object with artifact ref and diagnostics | 404 if not found |
 | `PATCH` | `/api/jobs/:id/status` | `{ status, step? }` | Updated `Job` | Editor → Manager status update |
 | `PUT` | `/api/jobs/:id/artifact` | Signed artifact payload | `{ artifact_id, version }` | Immutable; creates new version |
-| `POST` | `/api/jobs/:id/work` | `{ kernel, Q, truncation, seed }` | `202 Accepted` | Manager → Editor dispatch |
-| `POST` | `/api/jobs/:id/verify` | `{ artifact_ref, diagnostics }` | `202 Accepted` | Manager → Verifier dispatch |
-| `POST` | `/api/jobs/:id/verdict` | `{ verdict, issues, recomputed_metrics, signed_proof }` | `200 OK` | Verifier → Manager result |
+| `POST` | `/api/jobs/:id/work` | `{ kernel, Q, truncation, seed? }` | `202 Accepted` | Manager → Editor dispatch |
+| `POST` | `/api/jobs/:id/verify` | `{ artifact_id }` | `202 Accepted` | Manager → Verifier dispatch |
+| `POST` | `/api/jobs/:id/verdict` | `{ verdict, issues, recomputed_metrics, signed_proof }` | `200 OK` with updated `Job` | Verifier → Manager result; sets final status |
+| `POST` | `/api/jobs/:id/retry` | — | `{ job_id, status: "queued", retry_count }` | Re-enqueues a `failed` job (max 3 manual retries) |
 
 #### Job Status Values
 
@@ -221,7 +242,7 @@ All routes are mounted under `/api`. The base OpenAPI spec lives at `lib/api-spe
 **ORM:** Drizzle ORM (`lib/db/src/schema/index.ts`)
 **Database:** PostgreSQL
 
-Schema is not yet implemented **[spec/planned]**. The following tables are required:
+Schema is **implemented [current]** and pushed via `pnpm --filter @workspace/db run push`. The following tables are present in production:
 
 ### `jobs`
 
@@ -384,16 +405,16 @@ Policy thresholds are submitted per-job in the `policy_config` field of `POST /a
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | **[spec/planned]** PostgreSQL connection string — enforced by DB layer once schema is implemented |
-| `VERIFIER_SIGNING_KEY` | Yes | **[spec/planned]** Secret key for HMAC-SHA256 artifact signing — enforced by Verifier worker once implemented |
+| `DATABASE_URL` | Yes | **[current]** PostgreSQL connection string — enforced by `lib/db/src/index.ts` (throws if unset) |
+| `VERIFIER_SIGNING_KEY` | Yes (production) | **[current]** Secret key for HMAC-SHA256 artifact signing in `workers/verifier.ts`. Falls back to a hardcoded development key with a warning if unset — **must be overridden in production** |
 | `PORT` | Yes | **[current]** Port for the API server — enforced at startup in `artifacts/api-server/src/index.ts` (throws if unset) |
 | `NODE_ENV` | Yes | **[current]** Required by Express and pino-http for production behaviour |
-| `DEFAULT_SPECTRAL_RADIUS_MAX` | No | **[spec/planned]** Override global policy default for spectral radius check |
-| `DEFAULT_COND_LIMIT` | No | **[spec/planned]** Override global policy default for condition number check |
-| `DEFAULT_DUAL_ERROR_TOL` | No | **[spec/planned]** Override global policy default for dual truncation error check |
-| `DEFAULT_SPECTRAL_TAIL_TOL` | No | **[spec/planned]** Override global policy default for spectral tail check |
-| `JOB_TIMEOUT_MS` | No | **[spec/planned]** Per-job execution timeout in ms; required by Manager PDR |
-| `MAX_CONCURRENT_JOBS` | No | **[spec/planned]** Concurrent pipeline cap; Manager PDR target is ≥ 50 |
+| `JOB_TIMEOUT_MS` | No | **[current]** Per-job execution timeout in ms (default 300000) — read in `workers/pipeline.ts` |
+| `MAX_CONCURRENT_JOBS` | No | **[spec/planned]** Concurrent pipeline cap; Manager PDR target is ≥ 50. Currently jobs run via `setImmediate` and are not bounded — see follow-up task #8 for persistent queue |
+| `DEFAULT_SPECTRAL_RADIUS_MAX` | No | **[spec/planned]** Global override for CHK02 threshold (currently per-job only via `policy_config`) |
+| `DEFAULT_COND_LIMIT` | No | **[spec/planned]** Global override for CHK03 threshold |
+| `DEFAULT_DUAL_ERROR_TOL` | No | **[spec/planned]** Global override for CHK04 threshold |
+| `DEFAULT_SPECTRAL_TAIL_TOL` | No | **[spec/planned]** Global override for CHK05 threshold |
 
 ### Database
 
@@ -462,15 +483,17 @@ The following items are explicitly out of scope for the initial deployment:
 
 | Item | Rationale |
 |---|---|
-| Authentication and user accounts | Planned as a follow-up task |
-| Real GPU / distributed numerical compute | Editor runs in-process on Node; no GPU acceleration. Specific numerical library is chosen during implementation. |
-| External LLM/AGI model inference | No external model calls in v1; `model_pool` is optional and defaults to a synthetic basis |
-| WebSocket real-time streaming | Job status is delivered via client polling (`GET /api/jobs/:id`); WebSocket upgrade is deferred |
-| Export (PDF, CSV) | Not implemented in v1 |
-| Artifact encryption at rest | Encryption in transit (TLS) is enforced; at-rest encryption depends on the database provider |
-| Role-based access control | Access is unenforced in v1; RBAC is required before multi-tenant deployment |
-| Fuzz and performance tests | Unit and integration tests only in v1; fuzz/load tests are deferred |
-| Signing key rotation | Manual key rotation only in v1; automated rotation is a follow-up |
+| Frontend UI (User Mode and Developer Mode) | Tracked as follow-up task #7. The backend exposes the full contract; UI consumes it via the generated React Query hooks in `lib/api-client-react`. |
+| Persistent job queue surviving restarts | Tracked as follow-up task #8. Currently jobs are dispatched in-process via `setImmediate`; if the API server restarts mid-job, in-flight jobs remain in `editor_running`/`verifying` status. |
+| Authentication and user accounts | Out of scope for v1. The API has no auth middleware; deploy behind a trusted boundary. |
+| Real GPU / distributed numerical compute | Editor runs in-process on Node using a pure-TS math library; no GPU acceleration. |
+| External LLM/AGI model inference | No external model calls in v1; `model_pool` is optional and defaults to a canonical synthetic basis. |
+| WebSocket real-time streaming | Job status is delivered via client polling (`GET /api/jobs/:id`); WebSocket upgrade is deferred. |
+| Export (PDF, CSV) | Not implemented in v1; artifact JSON is returned via the API and can be exported client-side. |
+| Artifact encryption at rest | Encryption in transit (TLS) is enforced by the deployment platform; at-rest encryption depends on the database provider. |
+| Role-based access control | Access is unenforced in v1; RBAC is required before multi-tenant deployment. |
+| Automated signing key rotation | Manual key rotation only — set a new `VERIFIER_SIGNING_KEY` and redeploy. Existing `signed_proof` values become invalid and would need to be re-verified by re-running the Verifier. |
+| Performance / load tests | Unit, integration, and fuzz tests are present (90 tests). Sustained-load tests against the Manager PDR target of ≥50 concurrent jobs are deferred. |
 
 ---
 

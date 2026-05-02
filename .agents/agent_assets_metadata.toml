@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ftxo-JLIhfTSoah_iiM5e"
+uri = "file://README.md"
+type = "text"
+title = "Innoculus — Deployment Reference & Verification Guide"
