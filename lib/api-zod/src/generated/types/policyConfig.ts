@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface PolicyConfig {
+  spectral_radius_max?: number;
+  cond_limit?: number;
+  dual_error_tol?: number;
+  spectral_tail_tol?: number;
 }

@@ -5,7 +5,9 @@
  * Innoculus API specification — Manager / Editor / Verifier pipeline
  * OpenAPI spec version: 0.2.0
  */
+import type { PatchJobStatusRequestStatus } from "./patchJobStatusRequestStatus";
 
-export interface HealthStatus {
-  status: string;
+export interface PatchJobStatusRequest {
+  status: PatchJobStatusRequestStatus;
+  step?: string;
 }

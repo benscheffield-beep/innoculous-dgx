@@ -2,14 +2,16 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: Innoculus API specification — Manager / Editor / Verifier pipeline
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: jobs
+    description: Job lifecycle and pipeline management
 paths:
   /healthz:
     get:
@@ -24,6 +26,246 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /jobs:
+    post:
+      operationId: createJob
+      tags: [jobs]
+      summary: Create a pipeline job
+      description: Creates a new job and enqueues it for the Editor pipeline. Idempotent when job_id is supplied.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJobRequest"
+      responses:
+        "201":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "200":
+          description: Existing job returned (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List all jobs
+      description: Returns a paginated list of all jobs
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated job list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedJobsResponse"
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get job by ID
+      description: Returns full job state including status, artifact reference, and diagnostics
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Job found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetail"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{id}/status:
+    patch:
+      operationId: patchJobStatus
+      tags: [jobs]
+      summary: Update job status
+      description: Editor or internal pipeline updates job pipeline status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchJobStatusRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{id}/artifact:
+    put:
+      operationId: putJobArtifact
+      tags: [jobs]
+      summary: Upload artifact
+      description: Editor uploads a computed artifact. Creates a new immutable version.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutJobArtifactRequest"
+      responses:
+        "200":
+          description: Artifact stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobArtifact"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{id}/work:
+    post:
+      operationId: dispatchJobWork
+      tags: [jobs]
+      summary: Dispatch work to Editor
+      description: Manager dispatches work payload to the Editor subagent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DispatchWorkRequest"
+      responses:
+        "202":
+          description: Work dispatched
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{id}/verify:
+    post:
+      operationId: dispatchJobVerify
+      tags: [jobs]
+      summary: Dispatch artifact to Verifier
+      description: Manager sends artifact and diagnostics to the Verifier subagent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DispatchVerifyRequest"
+      responses:
+        "202":
+          description: Verification dispatched
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{id}/verdict:
+    post:
+      operationId: postJobVerdict
+      tags: [jobs]
+      summary: Receive Verifier verdict
+      description: Verifier posts its verdict back to the Manager
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostVerdictRequest"
+      responses:
+        "200":
+          description: Verdict recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +276,291 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    KernelParams:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [gaussian, mellin]
+        sigma:
+          type: number
+        alpha:
+          type: number
+      required:
+        - type
+
+    LatencyParams:
+      type: object
+      properties:
+        lambda:
+          type: number
+        delta:
+          type: number
+        Tnow:
+          type: number
+      required: [lambda, delta, Tnow]
+
+    TruncationParams:
+      type: object
+      properties:
+        M:
+          type: integer
+        r:
+          type: integer
+      required: [M, r]
+
+    PrecisionConfig:
+      type: object
+      properties:
+        b:
+          type: integer
+        tol:
+          type: number
+        safety_margin:
+          type: number
+      required: [b, tol]
+
+    PolicyConfig:
+      type: object
+      properties:
+        spectral_radius_max:
+          type: number
+          default: 0.999
+        cond_limit:
+          type: number
+          default: 1000000
+        dual_error_tol:
+          type: number
+          default: 0.000001
+        spectral_tail_tol:
+          type: number
+          default: 0.000001
+
+    CreateJobRequest:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: Optional client-supplied ID for idempotency
+        kernel:
+          $ref: "#/components/schemas/KernelParams"
+        Q:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+        truncation:
+          $ref: "#/components/schemas/TruncationParams"
+        latency:
+          $ref: "#/components/schemas/LatencyParams"
+        precision:
+          $ref: "#/components/schemas/PrecisionConfig"
+        policy_config:
+          $ref: "#/components/schemas/PolicyConfig"
+        model_pool:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required: [kernel, Q, truncation, latency, precision]
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, editor_running, verifying, complete, complete_with_warnings, failed]
+        kernel_params:
+          type: object
+          additionalProperties: true
+        policy_config:
+          type: object
+          additionalProperties: true
+        current_artifact_id:
+          type: string
+          format: uuid
+          nullable: true
+        retry_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, status, kernel_params, policy_config, retry_count, created_at, updated_at]
+
+    JobDetail:
+      allOf:
+        - $ref: "#/components/schemas/Job"
+        - type: object
+          properties:
+            artifact:
+              $ref: "#/components/schemas/JobArtifact"
+            diagnostics:
+              $ref: "#/components/schemas/JobDiagnostics"
+
+    JobArtifact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        payload:
+          type: object
+          additionalProperties: true
+        hash:
+          type: string
+        signed_proof:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, job_id, version, payload, hash, created_at]
+
+    JobDiagnostics:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        artifact_id:
+          type: string
+          format: uuid
+        spectral_radius:
+          type: number
+        cond_i_minus_g:
+          type: number
+        dual_truncation_error:
+          type: number
+        spectral_tail_error:
+          type: number
+        verdict:
+          type: string
+          enum: [pass, warn, fail]
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiagnosticIssue"
+        created_at:
+          type: string
+          format: date-time
+      required: [id, job_id, artifact_id, spectral_radius, cond_i_minus_g, dual_truncation_error, spectral_tail_error, verdict, issues, created_at]
+
+    DiagnosticIssue:
+      type: object
+      properties:
+        check_id:
+          type: string
+        severity:
+          type: string
+          enum: [fail, warn]
+        message:
+          type: string
+        remediation:
+          type: string
+      required: [check_id, severity, message, remediation]
+
+    PaginatedJobsResponse:
+      type: object
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Job"
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+      required: [jobs, total, page, page_size]
+
+    PatchJobStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [queued, editor_running, verifying, complete, complete_with_warnings, failed]
+        step:
+          type: string
+      required: [status]
+
+    PutJobArtifactRequest:
+      type: object
+      properties:
+        payload:
+          type: object
+          additionalProperties: true
+        hash:
+          type: string
+      required: [payload, hash]
+
+    DispatchWorkRequest:
+      type: object
+      properties:
+        kernel:
+          $ref: "#/components/schemas/KernelParams"
+        Q:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+        truncation:
+          $ref: "#/components/schemas/TruncationParams"
+        seed:
+          type: integer
+      required: [kernel, Q, truncation]
+
+    DispatchVerifyRequest:
+      type: object
+      properties:
+        artifact_id:
+          type: string
+          format: uuid
+        diagnostics:
+          type: object
+          additionalProperties: true
+      required: [artifact_id]
+
+    PostVerdictRequest:
+      type: object
+      properties:
+        verdict:
+          type: string
+          enum: [pass, warn, fail]
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiagnosticIssue"
+        recomputed_metrics:
+          type: object
+          additionalProperties: true
+        signed_proof:
+          type: string
+      required: [verdict, issues, recomputed_metrics, signed_proof]

@@ -5,7 +5,10 @@
  * Innoculus API specification — Manager / Editor / Verifier pipeline
  * OpenAPI spec version: 0.2.0
  */
+import type { KernelParamsType } from "./kernelParamsType";
 
-export interface HealthStatus {
-  status: string;
+export interface KernelParams {
+  type: KernelParamsType;
+  sigma?: number;
+  alpha?: number;
 }
