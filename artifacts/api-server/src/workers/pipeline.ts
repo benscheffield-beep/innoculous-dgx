@@ -159,14 +159,21 @@ async function runEditorVerifierCycle(
 
   if (isCutoffArtifact(artifact)) {
     const cutoffPayload: CutoffArtifactPayload = artifact;
-    const cutoffDesc = descriptor as CutoffTraceDescriptor;
+    const pc = policy as {
+      judge_disagreement_max?: number;
+      min_probes_per_month?: number;
+      min_recheck_count?: number;
+    };
     const r = await runCutoffVerifier(cutoffPayload, hash, {
       policy: {
-        ...(cutoffDesc.judge_disagreement_max !== undefined
-          ? { judge_disagreement_max: cutoffDesc.judge_disagreement_max }
+        ...(pc.judge_disagreement_max !== undefined
+          ? { judge_disagreement_max: pc.judge_disagreement_max }
           : {}),
-        ...(cutoffDesc.cutoff_min_probes_per_month !== undefined
-          ? { min_probes_per_month: cutoffDesc.cutoff_min_probes_per_month }
+        ...(pc.min_probes_per_month !== undefined
+          ? { min_probes_per_month: pc.min_probes_per_month }
+          : {}),
+        ...(pc.min_recheck_count !== undefined
+          ? { min_recheck_count: pc.min_recheck_count }
           : {}),
       },
     });

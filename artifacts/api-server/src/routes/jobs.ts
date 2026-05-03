@@ -13,6 +13,16 @@ const kernelParamsSchema = z.object({
   alpha: z.number().positive().optional(),
 });
 
+const policyConfigSchema = z.object({
+  spectral_radius_max: z.number().optional(),
+  cond_limit: z.number().optional(),
+  dual_error_tol: z.number().optional(),
+  spectral_tail_tol: z.number().optional(),
+  judge_disagreement_max: z.number().min(0).max(1).optional(),
+  min_probes_per_month: z.number().int().positive().optional(),
+  min_recheck_count: z.number().int().positive().optional(),
+});
+
 const numericalDescriptorSchema = z.object({
   kind: z.literal("numerical").optional(),
   job_id: z.string().uuid().optional(),
@@ -29,14 +39,7 @@ const numericalDescriptorSchema = z.object({
     tol: z.number().positive(),
     safety_margin: z.number().positive().optional(),
   }),
-  policy_config: z
-    .object({
-      spectral_radius_max: z.number().optional(),
-      cond_limit: z.number().optional(),
-      dual_error_tol: z.number().optional(),
-      spectral_tail_tol: z.number().optional(),
-    })
-    .optional(),
+  policy_config: policyConfigSchema.optional(),
   model_pool: z.array(z.unknown()).optional(),
   seed: z.number().int().optional(),
 });
@@ -54,9 +57,7 @@ const cutoffDescriptorSchema = z.object({
   judge_model: z.string().min(1),
   probes: z.array(cutoffProbeSchema).min(1),
   judge_temperature: z.number().min(0).max(2).optional(),
-  judge_disagreement_max: z.number().min(0).max(1).optional(),
-  cutoff_min_probes_per_month: z.number().int().positive().optional(),
-  policy_config: z.record(z.unknown()).optional(),
+  policy_config: policyConfigSchema.optional(),
   seed: z.number().int().optional(),
 });
 

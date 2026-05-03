@@ -135,6 +135,27 @@ describe("POST /api/jobs – success & idempotency", () => {
     expect(res.status).toBe(201);
     expect(res.body.policy_config.spectral_radius_max).toBe(0.95);
   });
+
+  it("stores cutoff_trace policy_config thresholds when provided", async () => {
+    const res = await request(app)
+      .post("/api/jobs")
+      .send({
+        kind: "cutoff_trace",
+        model: "test-model",
+        judge_model: "test-judge",
+        probes: [{ question: "q", answer: "a", date: "2024-01" }],
+        policy_config: {
+          judge_disagreement_max: 0.2,
+          min_probes_per_month: 5,
+          min_recheck_count: 4,
+        },
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.kind).toBe("cutoff_trace");
+    expect(res.body.policy_config.judge_disagreement_max).toBe(0.2);
+    expect(res.body.policy_config.min_probes_per_month).toBe(5);
+    expect(res.body.policy_config.min_recheck_count).toBe(4);
+  });
 });
 
 describe("GET /api/jobs – listing", () => {

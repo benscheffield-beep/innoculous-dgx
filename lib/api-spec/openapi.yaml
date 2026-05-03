@@ -332,6 +332,10 @@ components:
 
     PolicyConfig:
       type: object
+      description: |
+        Per-job policy thresholds. The numerical fields apply to the numerical
+        Editor/Verifier; the cutoff_* fields apply to the cutoff_trace Verifier.
+        Per-job values override defaults.
       properties:
         spectral_radius_max:
           type: number
@@ -345,6 +349,22 @@ components:
         spectral_tail_tol:
           type: number
           default: 0.000001
+        judge_disagreement_max:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.34
+          description: cutoff_trace CT02 — max allowed judge spot-recheck disagreement rate
+        min_probes_per_month:
+          type: integer
+          minimum: 1
+          default: 2
+          description: cutoff_trace CT04 — minimum probes required per YYYY-MM bin
+        min_recheck_count:
+          type: integer
+          minimum: 1
+          default: 3
+          description: cutoff_trace CT02 — minimum number of probes spot-rechecked
 
     CreateJobRequest:
       oneOf:
@@ -425,9 +445,79 @@ components:
           items:
             $ref: "#/components/schemas/CutoffProbe"
         policy_config:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/PolicyConfig"
       required: [kind, model, judge_model, probes]
+
+    CutoffProbeResult:
+      type: object
+      properties:
+        question: { type: string }
+        answer: { type: string }
+        date: { type: string }
+        model_answer: { type: string }
+        judge_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        judge_reasoning: { type: string }
+      required: [question, answer, date, model_answer, judge_score, judge_reasoning]
+
+    MonthlyAggregate:
+      type: object
+      properties:
+        month:
+          type: string
+          description: YYYY-MM
+        n:
+          type: integer
+        knew_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+      required: [month, n, knew_rate]
+
+    CutoffEstimate:
+      type: object
+      properties:
+        month: { type: string, description: YYYY-MM }
+        ci_low: { type: string, description: YYYY-MM (95% CI lower bound) }
+        ci_high: { type: string, description: YYYY-MM (95% CI upper bound) }
+        fit_quality:
+          type: number
+          description: McFadden pseudo-R² of the logistic changepoint fit
+      required: [month, ci_low, ci_high, fit_quality]
+
+    NumericalArtifactPayload:
+      type: object
+      additionalProperties: true
+      description: Numerical pipeline artifact (kernel coefficients, diagnostics, spectral data).
+
+    CutoffArtifactPayload:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [cutoff_trace]
+        model: { type: string }
+        judge_model: { type: string }
+        probe_results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CutoffProbeResult"
+        monthly_aggregates:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyAggregate"
+        cutoff_estimate:
+          $ref: "#/components/schemas/CutoffEstimate"
+      required: [kind, model, judge_model, probe_results, monthly_aggregates, cutoff_estimate]
+
+    ArtifactPayload:
+      oneOf:
+        - $ref: "#/components/schemas/NumericalArtifactPayload"
+        - $ref: "#/components/schemas/CutoffArtifactPayload"
+      discriminator:
+        propertyName: kind
 
     Job:
       type: object
@@ -485,8 +575,7 @@ components:
         version:
           type: integer
         payload:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/ArtifactPayload"
         hash:
           type: string
         signed_proof:

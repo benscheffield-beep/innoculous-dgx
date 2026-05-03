@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { CreateCutoffTraceJobRequestKind } from "./createCutoffTraceJobRequestKind";
-import type { CreateCutoffTraceJobRequestPolicyConfig } from "./createCutoffTraceJobRequestPolicyConfig";
 import type { CutoffProbe } from "./cutoffProbe";
+import type { PolicyConfig } from "./policyConfig";
 
 export interface CreateCutoffTraceJobRequest {
   kind: CreateCutoffTraceJobRequestKind;
@@ -20,5 +20,5 @@ export interface CreateCutoffTraceJobRequest {
   judge_temperature?: number;
   /** @minItems 1 */
   probes: CutoffProbe[];
-  policy_config?: CreateCutoffTraceJobRequestPolicyConfig;
+  policy_config?: PolicyConfig;
 }

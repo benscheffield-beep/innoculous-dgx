@@ -45,11 +45,33 @@ export interface PrecisionConfig {
   safety_margin?: number;
 }
 
+/**
+ * Per-job policy thresholds. The numerical fields apply to the numerical
+Editor/Verifier; the cutoff_* fields apply to the cutoff_trace Verifier.
+Per-job values override defaults.
+
+ */
 export interface PolicyConfig {
   spectral_radius_max?: number;
   cond_limit?: number;
   dual_error_tol?: number;
   spectral_tail_tol?: number;
+  /**
+   * cutoff_trace CT02 — max allowed judge spot-recheck disagreement rate
+   * @minimum 0
+   * @maximum 1
+   */
+  judge_disagreement_max?: number;
+  /**
+   * cutoff_trace CT04 — minimum probes required per YYYY-MM bin
+   * @minimum 1
+   */
+  min_probes_per_month?: number;
+  /**
+   * cutoff_trace CT02 — minimum number of probes spot-rechecked
+   * @minimum 1
+   */
+  min_recheck_count?: number;
 }
 
 /**
@@ -93,10 +115,6 @@ export interface CutoffProbe {
   date: string;
 }
 
-export type CreateCutoffTraceJobRequestPolicyConfig = {
-  [key: string]: unknown;
-};
-
 export interface CreateCutoffTraceJobRequest {
   kind: CreateCutoffTraceJobRequestKind;
   /** Optional client-supplied ID for idempotency */
@@ -108,12 +126,72 @@ export interface CreateCutoffTraceJobRequest {
   judge_temperature?: number;
   /** @minItems 1 */
   probes: CutoffProbe[];
-  policy_config?: CreateCutoffTraceJobRequestPolicyConfig;
+  policy_config?: PolicyConfig;
 }
 
 export type CreateJobRequest =
   | CreateNumericalJobRequest
   | CreateCutoffTraceJobRequest;
+
+export interface CutoffProbeResult {
+  question: string;
+  answer: string;
+  date: string;
+  model_answer: string;
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
+  judge_score: number;
+  judge_reasoning: string;
+}
+
+export interface MonthlyAggregate {
+  /** YYYY-MM */
+  month: string;
+  n: number;
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
+  knew_rate: number;
+}
+
+export interface CutoffEstimate {
+  /** YYYY-MM */
+  month: string;
+  /** YYYY-MM (95% CI lower bound) */
+  ci_low: string;
+  /** YYYY-MM (95% CI upper bound) */
+  ci_high: string;
+  /** McFadden pseudo-R² of the logistic changepoint fit */
+  fit_quality: number;
+}
+
+/**
+ * Numerical pipeline artifact (kernel coefficients, diagnostics, spectral data).
+ */
+export interface NumericalArtifactPayload {
+  [key: string]: unknown;
+}
+
+export type CutoffArtifactPayloadKind =
+  (typeof CutoffArtifactPayloadKind)[keyof typeof CutoffArtifactPayloadKind];
+
+export const CutoffArtifactPayloadKind = {
+  cutoff_trace: "cutoff_trace",
+} as const;
+
+export interface CutoffArtifactPayload {
+  kind: CutoffArtifactPayloadKind;
+  model: string;
+  judge_model: string;
+  probe_results: CutoffProbeResult[];
+  monthly_aggregates: MonthlyAggregate[];
+  cutoff_estimate: CutoffEstimate;
+}
+
+export type ArtifactPayload = NumericalArtifactPayload | CutoffArtifactPayload;
 
 /**
  * Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.
@@ -157,13 +235,11 @@ export interface Job {
   updated_at: string;
 }
 
-export type JobArtifactPayload = { [key: string]: unknown };
-
 export interface JobArtifact {
   id: string;
   job_id: string;
   version: number;
-  payload: JobArtifactPayload;
+  payload: ArtifactPayload;
   hash: string;
   signed_proof?: string | null;
   created_at: string;

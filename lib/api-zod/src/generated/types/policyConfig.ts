@@ -6,9 +6,31 @@
  * OpenAPI spec version: 0.2.0
  */
 
+/**
+ * Per-job policy thresholds. The numerical fields apply to the numerical
+Editor/Verifier; the cutoff_* fields apply to the cutoff_trace Verifier.
+Per-job values override defaults.
+
+ */
 export interface PolicyConfig {
   spectral_radius_max?: number;
   cond_limit?: number;
   dual_error_tol?: number;
   spectral_tail_tol?: number;
+  /**
+   * cutoff_trace CT02 — max allowed judge spot-recheck disagreement rate
+   * @minimum 0
+   * @maximum 1
+   */
+  judge_disagreement_max?: number;
+  /**
+   * cutoff_trace CT04 — minimum probes required per YYYY-MM bin
+   * @minimum 1
+   */
+  min_probes_per_month?: number;
+  /**
+   * cutoff_trace CT02 — minimum number of probes spot-rechecked
+   * @minimum 1
+   */
+  min_recheck_count?: number;
 }

@@ -23,7 +23,26 @@ export const createJobBodyOnePolicyConfigSpectralRadiusMaxDefault = 0.999;
 export const createJobBodyOnePolicyConfigCondLimitDefault = 1000000;
 export const createJobBodyOnePolicyConfigDualErrorTolDefault = 0.000001;
 export const createJobBodyOnePolicyConfigSpectralTailTolDefault = 0.000001;
+export const createJobBodyOnePolicyConfigJudgeDisagreementMaxDefault = 0.34;
+export const createJobBodyOnePolicyConfigJudgeDisagreementMaxMin = 0;
+export const createJobBodyOnePolicyConfigJudgeDisagreementMaxMax = 1;
+
+export const createJobBodyOnePolicyConfigMinProbesPerMonthDefault = 2;
+
+export const createJobBodyOnePolicyConfigMinRecheckCountDefault = 3;
+
 export const createJobBodyTwoJudgeTemperatureDefault = 0;
+export const createJobBodyTwoPolicyConfigSpectralRadiusMaxDefault = 0.999;
+export const createJobBodyTwoPolicyConfigCondLimitDefault = 1000000;
+export const createJobBodyTwoPolicyConfigDualErrorTolDefault = 0.000001;
+export const createJobBodyTwoPolicyConfigSpectralTailTolDefault = 0.000001;
+export const createJobBodyTwoPolicyConfigJudgeDisagreementMaxDefault = 0.34;
+export const createJobBodyTwoPolicyConfigJudgeDisagreementMaxMin = 0;
+export const createJobBodyTwoPolicyConfigJudgeDisagreementMaxMax = 1;
+
+export const createJobBodyTwoPolicyConfigMinProbesPerMonthDefault = 2;
+
+export const createJobBodyTwoPolicyConfigMinRecheckCountDefault = 3;
 
 export const CreateJobBody = zod.union([
   zod.object({
@@ -70,8 +89,33 @@ export const CreateJobBody = zod.union([
         spectral_tail_tol: zod
           .number()
           .default(createJobBodyOnePolicyConfigSpectralTailTolDefault),
+        judge_disagreement_max: zod
+          .number()
+          .min(createJobBodyOnePolicyConfigJudgeDisagreementMaxMin)
+          .max(createJobBodyOnePolicyConfigJudgeDisagreementMaxMax)
+          .default(createJobBodyOnePolicyConfigJudgeDisagreementMaxDefault)
+          .describe(
+            "cutoff_trace CT02 — max allowed judge spot-recheck disagreement rate",
+          ),
+        min_probes_per_month: zod
+          .number()
+          .min(1)
+          .default(createJobBodyOnePolicyConfigMinProbesPerMonthDefault)
+          .describe(
+            "cutoff_trace CT04 — minimum probes required per YYYY-MM bin",
+          ),
+        min_recheck_count: zod
+          .number()
+          .min(1)
+          .default(createJobBodyOnePolicyConfigMinRecheckCountDefault)
+          .describe(
+            "cutoff_trace CT02 — minimum number of probes spot-rechecked",
+          ),
       })
-      .optional(),
+      .optional()
+      .describe(
+        "Per-job policy thresholds. The numerical fields apply to the numerical\nEditor\/Verifier; the cutoff_\* fields apply to the cutoff_trace Verifier.\nPer-job values override defaults.\n",
+      ),
     model_pool: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   }),
   zod.object({
@@ -107,7 +151,47 @@ export const CreateJobBody = zod.union([
         }),
       )
       .min(1),
-    policy_config: zod.record(zod.string(), zod.unknown()).optional(),
+    policy_config: zod
+      .object({
+        spectral_radius_max: zod
+          .number()
+          .default(createJobBodyTwoPolicyConfigSpectralRadiusMaxDefault),
+        cond_limit: zod
+          .number()
+          .default(createJobBodyTwoPolicyConfigCondLimitDefault),
+        dual_error_tol: zod
+          .number()
+          .default(createJobBodyTwoPolicyConfigDualErrorTolDefault),
+        spectral_tail_tol: zod
+          .number()
+          .default(createJobBodyTwoPolicyConfigSpectralTailTolDefault),
+        judge_disagreement_max: zod
+          .number()
+          .min(createJobBodyTwoPolicyConfigJudgeDisagreementMaxMin)
+          .max(createJobBodyTwoPolicyConfigJudgeDisagreementMaxMax)
+          .default(createJobBodyTwoPolicyConfigJudgeDisagreementMaxDefault)
+          .describe(
+            "cutoff_trace CT02 — max allowed judge spot-recheck disagreement rate",
+          ),
+        min_probes_per_month: zod
+          .number()
+          .min(1)
+          .default(createJobBodyTwoPolicyConfigMinProbesPerMonthDefault)
+          .describe(
+            "cutoff_trace CT04 — minimum probes required per YYYY-MM bin",
+          ),
+        min_recheck_count: zod
+          .number()
+          .min(1)
+          .default(createJobBodyTwoPolicyConfigMinRecheckCountDefault)
+          .describe(
+            "cutoff_trace CT02 — minimum number of probes spot-rechecked",
+          ),
+      })
+      .optional()
+      .describe(
+        "Per-job policy thresholds. The numerical fields apply to the numerical\nEditor\/Verifier; the cutoff_\* fields apply to the cutoff_trace Verifier.\nPer-job values override defaults.\n",
+      ),
   }),
 ]);
 
@@ -192,6 +276,12 @@ export const GetJobParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const getJobResponseTwoArtifactPayloadTwoProbeResultsItemJudgeScoreMin = 0;
+export const getJobResponseTwoArtifactPayloadTwoProbeResultsItemJudgeScoreMax = 1;
+
+export const getJobResponseTwoArtifactPayloadTwoMonthlyAggregatesItemKnewRateMin = 0;
+export const getJobResponseTwoArtifactPayloadTwoMonthlyAggregatesItemKnewRateMax = 1;
+
 export const GetJobResponse = zod
   .object({
     id: zod.string().uuid(),
@@ -226,7 +316,59 @@ export const GetJobResponse = zod
           id: zod.string().uuid(),
           job_id: zod.string().uuid(),
           version: zod.number(),
-          payload: zod.record(zod.string(), zod.unknown()),
+          payload: zod.union([
+            zod
+              .record(zod.string(), zod.unknown())
+              .describe(
+                "Numerical pipeline artifact (kernel coefficients, diagnostics, spectral data).",
+              ),
+            zod.object({
+              kind: zod.enum(["cutoff_trace"]),
+              model: zod.string(),
+              judge_model: zod.string(),
+              probe_results: zod.array(
+                zod.object({
+                  question: zod.string(),
+                  answer: zod.string(),
+                  date: zod.string(),
+                  model_answer: zod.string(),
+                  judge_score: zod
+                    .number()
+                    .min(
+                      getJobResponseTwoArtifactPayloadTwoProbeResultsItemJudgeScoreMin,
+                    )
+                    .max(
+                      getJobResponseTwoArtifactPayloadTwoProbeResultsItemJudgeScoreMax,
+                    ),
+                  judge_reasoning: zod.string(),
+                }),
+              ),
+              monthly_aggregates: zod.array(
+                zod.object({
+                  month: zod.string().describe("YYYY-MM"),
+                  n: zod.number(),
+                  knew_rate: zod
+                    .number()
+                    .min(
+                      getJobResponseTwoArtifactPayloadTwoMonthlyAggregatesItemKnewRateMin,
+                    )
+                    .max(
+                      getJobResponseTwoArtifactPayloadTwoMonthlyAggregatesItemKnewRateMax,
+                    ),
+                }),
+              ),
+              cutoff_estimate: zod.object({
+                month: zod.string().describe("YYYY-MM"),
+                ci_low: zod.string().describe("YYYY-MM (95% CI lower bound)"),
+                ci_high: zod.string().describe("YYYY-MM (95% CI upper bound)"),
+                fit_quality: zod
+                  .number()
+                  .describe(
+                    "McFadden pseudo-R² of the logistic changepoint fit",
+                  ),
+              }),
+            }),
+          ]),
           hash: zod.string(),
           signed_proof: zod.string().nullish(),
           created_at: zod.coerce.date(),
@@ -316,11 +458,63 @@ export const PutJobArtifactBody = zod.object({
   hash: zod.string(),
 });
 
+export const putJobArtifactResponsePayloadTwoProbeResultsItemJudgeScoreMin = 0;
+export const putJobArtifactResponsePayloadTwoProbeResultsItemJudgeScoreMax = 1;
+
+export const putJobArtifactResponsePayloadTwoMonthlyAggregatesItemKnewRateMin = 0;
+export const putJobArtifactResponsePayloadTwoMonthlyAggregatesItemKnewRateMax = 1;
+
 export const PutJobArtifactResponse = zod.object({
   id: zod.string().uuid(),
   job_id: zod.string().uuid(),
   version: zod.number(),
-  payload: zod.record(zod.string(), zod.unknown()),
+  payload: zod.union([
+    zod
+      .record(zod.string(), zod.unknown())
+      .describe(
+        "Numerical pipeline artifact (kernel coefficients, diagnostics, spectral data).",
+      ),
+    zod.object({
+      kind: zod.enum(["cutoff_trace"]),
+      model: zod.string(),
+      judge_model: zod.string(),
+      probe_results: zod.array(
+        zod.object({
+          question: zod.string(),
+          answer: zod.string(),
+          date: zod.string(),
+          model_answer: zod.string(),
+          judge_score: zod
+            .number()
+            .min(putJobArtifactResponsePayloadTwoProbeResultsItemJudgeScoreMin)
+            .max(putJobArtifactResponsePayloadTwoProbeResultsItemJudgeScoreMax),
+          judge_reasoning: zod.string(),
+        }),
+      ),
+      monthly_aggregates: zod.array(
+        zod.object({
+          month: zod.string().describe("YYYY-MM"),
+          n: zod.number(),
+          knew_rate: zod
+            .number()
+            .min(
+              putJobArtifactResponsePayloadTwoMonthlyAggregatesItemKnewRateMin,
+            )
+            .max(
+              putJobArtifactResponsePayloadTwoMonthlyAggregatesItemKnewRateMax,
+            ),
+        }),
+      ),
+      cutoff_estimate: zod.object({
+        month: zod.string().describe("YYYY-MM"),
+        ci_low: zod.string().describe("YYYY-MM (95% CI lower bound)"),
+        ci_high: zod.string().describe("YYYY-MM (95% CI upper bound)"),
+        fit_quality: zod
+          .number()
+          .describe("McFadden pseudo-R² of the logistic changepoint fit"),
+      }),
+    }),
+  ]),
   hash: zod.string(),
   signed_proof: zod.string().nullish(),
   created_at: zod.coerce.date(),

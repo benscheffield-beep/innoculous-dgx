@@ -6,6 +6,13 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type CreateCutoffTraceJobRequestPolicyConfig = {
-  [key: string]: unknown;
-};
+export interface MonthlyAggregate {
+  /** YYYY-MM */
+  month: string;
+  n: number;
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
+  knew_rate: number;
+}

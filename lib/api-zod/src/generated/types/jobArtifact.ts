@@ -5,13 +5,13 @@
  * Innoculus API specification — Manager / Editor / Verifier pipeline
  * OpenAPI spec version: 0.2.0
  */
-import type { JobArtifactPayload } from "./jobArtifactPayload";
+import type { ArtifactPayload } from "./artifactPayload";
 
 export interface JobArtifact {
   id: string;
   job_id: string;
   version: number;
-  payload: JobArtifactPayload;
+  payload: ArtifactPayload;
   hash: string;
   signed_proof?: string | null;
   created_at: Date;

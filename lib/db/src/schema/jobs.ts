@@ -23,6 +23,10 @@ export interface PolicyConfig {
   cond_limit?: number;
   dual_error_tol?: number;
   spectral_tail_tol?: number;
+  // cutoff_trace policy thresholds
+  judge_disagreement_max?: number;
+  min_probes_per_month?: number;
+  min_recheck_count?: number;
 }
 
 export interface NumericalDescriptor {
@@ -49,8 +53,6 @@ export interface CutoffTraceDescriptor {
   judge_model: string;
   probes: CutoffProbe[];
   judge_temperature?: number;
-  judge_disagreement_max?: number;
-  cutoff_min_probes_per_month?: number;
   seed?: number;
 }
 
