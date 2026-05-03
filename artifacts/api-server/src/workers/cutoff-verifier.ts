@@ -122,8 +122,10 @@ async function chkCT02JudgeAgreement(
         recheckScore = m ? (Number(m[1]!) >= 0.5 ? 1 : 0) : 0;
       }
     } catch (err) {
-      logger.warn({ err }, "spot-recheck judge call failed");
-      recheckScore = probe.judge_score; // treat as agreement if call fails
+      logger.warn({ err, probe_question: probe.question.slice(0, 60) }, "spot-recheck judge call failed; counting as disagreement");
+      // Count failed rechecks as disagreements so a flaky judge surfaces in CT02
+      // rather than silently passing verification.
+      recheckScore = probe.judge_score >= 0.5 ? 0 : 1;
     }
     const original = probe.judge_score >= 0.5 ? 1 : 0;
     if (recheckScore !== original) disagreements++;

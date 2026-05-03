@@ -63,11 +63,11 @@ function applyRemediation(
       d.judge_temperature = Math.min(1, Math.max(0.2, cur + 0.2));
       changed = true;
     }
-    if (actions.has("request_more_probes_in_window")) {
-      // Cannot synthesize new probes; lower min coverage to attempt to clear the warn
-      d.cutoff_min_probes_per_month = Math.max(1, (d.cutoff_min_probes_per_month ?? 2) - 1);
-      changed = true;
-    }
+    // Note: `request_more_probes_in_window` is intentionally NOT auto-applied.
+    // The Editor cannot synthesize new probes — that requires a fresh user
+    // submission. Lowering the coverage threshold would mask the data-sufficiency
+    // signal CT04 is meant to surface. The warn is left visible on the diagnostics
+    // row so the caller can decide whether to resubmit with more probes.
     return { descriptor: d, changed };
   }
 
