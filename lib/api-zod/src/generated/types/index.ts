@@ -6,8 +6,14 @@
  * OpenAPI spec version: 0.2.0
  */
 
+export * from "./createCutoffTraceJobRequest";
+export * from "./createCutoffTraceJobRequestKind";
+export * from "./createCutoffTraceJobRequestPolicyConfig";
 export * from "./createJobRequest";
-export * from "./createJobRequestModelPoolItem";
+export * from "./createNumericalJobRequest";
+export * from "./createNumericalJobRequestKind";
+export * from "./createNumericalJobRequestModelPoolItem";
+export * from "./cutoffProbe";
 export * from "./diagnosticIssue";
 export * from "./diagnosticIssueSeverity";
 export * from "./dispatchVerifyRequest";
@@ -22,6 +28,7 @@ export * from "./jobDetail";
 export * from "./jobDiagnostics";
 export * from "./jobDiagnosticsVerdict";
 export * from "./jobKernelParams";
+export * from "./jobKind";
 export * from "./jobPolicyConfig";
 export * from "./jobStatus";
 export * from "./kernelParams";

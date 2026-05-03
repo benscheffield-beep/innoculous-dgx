@@ -383,6 +383,53 @@ All 7 checks run in parallel (`parallel_checks: true`). Maximum runtime budget: 
 
 ---
 
+## 8b. Cutoff Trace Pipeline (LLM Knowledge-Cutoff Probing)
+
+The `cutoff_trace` job kind reuses the same Manager / Editor / Verifier skeleton, retry/backoff loop, HMAC signing chain, and Drizzle schema as the numerical pipeline, but operates on a different problem domain: empirically estimating an LLM's knowledge cutoff month from user-supplied probes.
+
+**Submission shape** (`POST /api/jobs`):
+
+```json
+{
+  "kind": "cutoff_trace",
+  "model": "gpt-4o-mini",
+  "judge_model": "gpt-4o",
+  "judge_temperature": 0,
+  "probes": [
+    { "question": "Who won the 2023 NBA Finals?", "answer": "Denver Nuggets", "date": "2023-06-12" },
+    { "question": "...", "answer": "...", "date": "YYYY-MM-DD" }
+  ]
+}
+```
+
+**Editor steps** (`artifacts/api-server/src/workers/cutoff-editor.ts`):
+
+| Step | Operation |
+|---|---|
+| 1 | For each probe, query `model` for an answer (system: "answer concisely; if unknown, say so") |
+| 2 | Grade each answer with `judge_model` as LLM-as-judge → `{score: 0|1, reason}` |
+| 3 | Aggregate by `YYYY-MM` → `monthly_aggregates[]` with per-month `knew_rate` |
+| 4 | Fit a logistic changepoint `p(t) = σ((cutoff − t) · k)` over candidate cutoffs (half-month resolution) and slope grid `{0.5, 1, 2, 4}` by max log-likelihood |
+| 5 | Derive 95% CI via likelihood-ratio profile (χ²₁ / 2 ≈ 1.92) and McFadden pseudo-R² as `fit_quality` |
+
+OpenAI calls go through `artifacts/api-server/src/lib/openai-client.ts`, which routes to the Replit AI Integrations proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL` / `AI_INTEGRATIONS_OPENAI_API_KEY`) and applies a small transient-error retry.
+
+**Verifier checks** (`artifacts/api-server/src/workers/cutoff-verifier.ts`):
+
+| ID | Name | Condition | Severity |
+|---|---|---|---|
+| CHK01 | `artifact_integrity` | recomputed `SHA-256(payload) == stored_hash` | **fail** |
+| CT02 | `judge_agreement` | spot-recheck disagreement rate ≤ `judge_disagreement_max` (default 0.34); sample size = `max(min_recheck_count, ceil(n·0.1))`; deterministic seed = mulberry32(hash) | **fail** |
+| CT03 | `monotonicity` | `knew_rate` should not jump up by >0.3 between consecutive post-cutoff months | warn |
+| CT04 | `coverage` | every month bin has ≥ `min_probes_per_month` probes (default 2) | warn |
+| CT05 | `privacy` | no email / phone / SSN PII patterns in probe text or model answers | **fail** |
+
+**Diagnostics row mapping:** `dual_truncation_error` = judge disagreement rate, `spectral_tail_error` = monotonicity violation count, `cond_I_minus_G` and `spectral_radius` are stored as `0` sentinels (not meaningful for this kind).
+
+**Artifact payload shape** is stored under the same `job_artifacts.payload` JSON column with `kind: "cutoff_trace"`. The `cutoff_estimate` field returns `{ month, ci_low, ci_high, fit_quality }` in `YYYY-MM` form.
+
+---
+
 ## 9. Policy Thresholds and Configuration
 
 Policy thresholds are submitted per-job in the `policy_config` field of `POST /api/jobs`. Each threshold maps directly to one or more Verifier checks.

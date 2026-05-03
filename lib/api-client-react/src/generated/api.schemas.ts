@@ -52,9 +52,21 @@ export interface PolicyConfig {
   spectral_tail_tol?: number;
 }
 
-export type CreateJobRequestModelPoolItem = { [key: string]: unknown };
+/**
+ * Optional kind discriminator. Defaults to numerical.
+ */
+export type CreateNumericalJobRequestKind =
+  (typeof CreateNumericalJobRequestKind)[keyof typeof CreateNumericalJobRequestKind];
 
-export interface CreateJobRequest {
+export const CreateNumericalJobRequestKind = {
+  numerical: "numerical",
+} as const;
+
+export type CreateNumericalJobRequestModelPoolItem = { [key: string]: unknown };
+
+export interface CreateNumericalJobRequest {
+  /** Optional kind discriminator. Defaults to numerical. */
+  kind?: CreateNumericalJobRequestKind;
   /** Optional client-supplied ID for idempotency */
   job_id?: string;
   kernel: KernelParams;
@@ -63,8 +75,55 @@ export interface CreateJobRequest {
   latency: LatencyParams;
   precision: PrecisionConfig;
   policy_config?: PolicyConfig;
-  model_pool?: CreateJobRequestModelPoolItem[];
+  model_pool?: CreateNumericalJobRequestModelPoolItem[];
 }
+
+export type CreateCutoffTraceJobRequestKind =
+  (typeof CreateCutoffTraceJobRequestKind)[keyof typeof CreateCutoffTraceJobRequestKind];
+
+export const CreateCutoffTraceJobRequestKind = {
+  cutoff_trace: "cutoff_trace",
+} as const;
+
+export interface CutoffProbe {
+  question: string;
+  /** Ground-truth answer for the LLM-as-judge to compare against */
+  answer: string;
+  /** Real-world publication / event date in YYYY-MM-DD form */
+  date: string;
+}
+
+export type CreateCutoffTraceJobRequestPolicyConfig = {
+  [key: string]: unknown;
+};
+
+export interface CreateCutoffTraceJobRequest {
+  kind: CreateCutoffTraceJobRequestKind;
+  /** Optional client-supplied ID for idempotency */
+  job_id?: string;
+  /** Target model whose knowledge cutoff is being estimated */
+  model: string;
+  /** Model used as the LLM-as-judge to grade target answers */
+  judge_model: string;
+  judge_temperature?: number;
+  /** @minItems 1 */
+  probes: CutoffProbe[];
+  policy_config?: CreateCutoffTraceJobRequestPolicyConfig;
+}
+
+export type CreateJobRequest =
+  | CreateNumericalJobRequest
+  | CreateCutoffTraceJobRequest;
+
+/**
+ * Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.
+ */
+export type JobKind = (typeof JobKind)[keyof typeof JobKind];
+
+export const JobKind = {
+  numerical: "numerical",
+  cutoff_trace: "cutoff_trace",
+} as const;
 
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
@@ -77,13 +136,19 @@ export const JobStatus = {
   failed: "failed",
 } as const;
 
+/**
+ * Job descriptor (numerical kernel params, or cutoff_trace probe specification).
+ */
 export type JobKernelParams = { [key: string]: unknown };
 
 export type JobPolicyConfig = { [key: string]: unknown };
 
 export interface Job {
   id: string;
+  /** Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing. */
+  kind: JobKind;
   status: JobStatus;
+  /** Job descriptor (numerical kernel params, or cutoff_trace probe specification). */
   kernel_params: JobKernelParams;
   policy_config: JobPolicyConfig;
   current_artifact_id?: string | null;

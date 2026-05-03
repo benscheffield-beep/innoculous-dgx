@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.2.0
  */
 
-/**
- * Job descriptor (numerical kernel params, or cutoff_trace probe specification).
- */
-export type JobKernelParams = { [key: string]: unknown };
+export type CreateCutoffTraceJobRequestPolicyConfig = {
+  [key: string]: unknown;
+};

@@ -5,21 +5,9 @@
  * Innoculus API specification — Manager / Editor / Verifier pipeline
  * OpenAPI spec version: 0.2.0
  */
-import type { CreateJobRequestModelPoolItem } from "./createJobRequestModelPoolItem";
-import type { KernelParams } from "./kernelParams";
-import type { LatencyParams } from "./latencyParams";
-import type { PolicyConfig } from "./policyConfig";
-import type { PrecisionConfig } from "./precisionConfig";
-import type { TruncationParams } from "./truncationParams";
+import type { CreateCutoffTraceJobRequest } from "./createCutoffTraceJobRequest";
+import type { CreateNumericalJobRequest } from "./createNumericalJobRequest";
 
-export interface CreateJobRequest {
-  /** Optional client-supplied ID for idempotency */
-  job_id?: string;
-  kernel: KernelParams;
-  Q: number[][];
-  truncation: TruncationParams;
-  latency: LatencyParams;
-  precision: PrecisionConfig;
-  policy_config?: PolicyConfig;
-  model_pool?: CreateJobRequestModelPoolItem[];
-}
+export type CreateJobRequest =
+  | CreateNumericalJobRequest
+  | CreateCutoffTraceJobRequest;

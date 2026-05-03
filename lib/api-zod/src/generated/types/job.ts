@@ -6,12 +6,16 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { JobKernelParams } from "./jobKernelParams";
+import type { JobKind } from "./jobKind";
 import type { JobPolicyConfig } from "./jobPolicyConfig";
 import type { JobStatus } from "./jobStatus";
 
 export interface Job {
   id: string;
+  /** Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing. */
+  kind: JobKind;
   status: JobStatus;
+  /** Job descriptor (numerical kernel params, or cutoff_trace probe specification). */
   kernel_params: JobKernelParams;
   policy_config: JobPolicyConfig;
   current_artifact_id?: string | null;

@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import request from "supertest";
+import { eq } from "drizzle-orm";
 import app from "../app.js";
+import { db, jobsTable } from "@workspace/db";
 
 vi.mock("../workers/pipeline.js", () => ({
   runPipeline: vi.fn().mockResolvedValue(undefined),
@@ -95,6 +97,8 @@ describe("POST /api/jobs – success & idempotency", () => {
   it("is idempotent when job_id is supplied", async () => {
     const { runPipeline } = await import("../workers/pipeline.js");
     const job_id = "550e8400-e29b-41d4-a716-446655440000";
+    await db.delete(jobsTable).where(eq(jobsTable.id, job_id));
+    vi.mocked(runPipeline).mockClear();
 
     const res1 = await request(app).post("/api/jobs").send({ ...VALID_CREATE_BODY, job_id });
     const res2 = await request(app).post("/api/jobs").send({ ...VALID_CREATE_BODY, job_id });
@@ -278,7 +282,10 @@ describe("Fuzz tests – adversarial inputs", () => {
 
   for (const [idx, body] of fuzzCases.entries()) {
     it(`rejects malformed input #${idx}`, async () => {
-      const res = await request(app).post("/api/jobs").send(body as object);
+      const req = request(app).post("/api/jobs").set("Content-Type", "application/json");
+      const res = await (typeof body === "object" && body !== null
+        ? req.send(body as object)
+        : req.send(JSON.stringify(body)));
       expect(res.status).toBeGreaterThanOrEqual(400);
       expect(res.status).toBeLessThan(500);
     });

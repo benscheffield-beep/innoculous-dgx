@@ -19,58 +19,105 @@ export const HealthCheckResponse = zod.object({
  * Creates a new job and enqueues it for the Editor pipeline. Idempotent when job_id is supplied.
  * @summary Create a pipeline job
  */
-export const createJobBodyPolicyConfigSpectralRadiusMaxDefault = 0.999;
-export const createJobBodyPolicyConfigCondLimitDefault = 1000000;
-export const createJobBodyPolicyConfigDualErrorTolDefault = 0.000001;
-export const createJobBodyPolicyConfigSpectralTailTolDefault = 0.000001;
+export const createJobBodyOnePolicyConfigSpectralRadiusMaxDefault = 0.999;
+export const createJobBodyOnePolicyConfigCondLimitDefault = 1000000;
+export const createJobBodyOnePolicyConfigDualErrorTolDefault = 0.000001;
+export const createJobBodyOnePolicyConfigSpectralTailTolDefault = 0.000001;
+export const createJobBodyTwoJudgeTemperatureDefault = 0;
 
-export const CreateJobBody = zod.object({
-  job_id: zod
-    .string()
-    .uuid()
-    .optional()
-    .describe("Optional client-supplied ID for idempotency"),
-  kernel: zod.object({
-    type: zod.enum(["gaussian", "mellin"]),
-    sigma: zod.number().optional(),
-    alpha: zod.number().optional(),
+export const CreateJobBody = zod.union([
+  zod.object({
+    kind: zod
+      .enum(["numerical"])
+      .optional()
+      .describe("Optional kind discriminator. Defaults to numerical."),
+    job_id: zod
+      .string()
+      .uuid()
+      .optional()
+      .describe("Optional client-supplied ID for idempotency"),
+    kernel: zod.object({
+      type: zod.enum(["gaussian", "mellin"]),
+      sigma: zod.number().optional(),
+      alpha: zod.number().optional(),
+    }),
+    Q: zod.array(zod.array(zod.number())),
+    truncation: zod.object({
+      M: zod.number(),
+      r: zod.number(),
+    }),
+    latency: zod.object({
+      lambda: zod.number(),
+      delta: zod.number(),
+      Tnow: zod.number(),
+    }),
+    precision: zod.object({
+      b: zod.number(),
+      tol: zod.number(),
+      safety_margin: zod.number().optional(),
+    }),
+    policy_config: zod
+      .object({
+        spectral_radius_max: zod
+          .number()
+          .default(createJobBodyOnePolicyConfigSpectralRadiusMaxDefault),
+        cond_limit: zod
+          .number()
+          .default(createJobBodyOnePolicyConfigCondLimitDefault),
+        dual_error_tol: zod
+          .number()
+          .default(createJobBodyOnePolicyConfigDualErrorTolDefault),
+        spectral_tail_tol: zod
+          .number()
+          .default(createJobBodyOnePolicyConfigSpectralTailTolDefault),
+      })
+      .optional(),
+    model_pool: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   }),
-  Q: zod.array(zod.array(zod.number())),
-  truncation: zod.object({
-    M: zod.number(),
-    r: zod.number(),
+  zod.object({
+    kind: zod.enum(["cutoff_trace"]),
+    job_id: zod
+      .string()
+      .uuid()
+      .optional()
+      .describe("Optional client-supplied ID for idempotency"),
+    model: zod
+      .string()
+      .describe("Target model whose knowledge cutoff is being estimated"),
+    judge_model: zod
+      .string()
+      .describe("Model used as the LLM-as-judge to grade target answers"),
+    judge_temperature: zod
+      .number()
+      .default(createJobBodyTwoJudgeTemperatureDefault),
+    probes: zod
+      .array(
+        zod.object({
+          question: zod.string(),
+          answer: zod
+            .string()
+            .describe(
+              "Ground-truth answer for the LLM-as-judge to compare against",
+            ),
+          date: zod
+            .string()
+            .describe(
+              "Real-world publication \/ event date in YYYY-MM-DD form",
+            ),
+        }),
+      )
+      .min(1),
+    policy_config: zod.record(zod.string(), zod.unknown()).optional(),
   }),
-  latency: zod.object({
-    lambda: zod.number(),
-    delta: zod.number(),
-    Tnow: zod.number(),
-  }),
-  precision: zod.object({
-    b: zod.number(),
-    tol: zod.number(),
-    safety_margin: zod.number().optional(),
-  }),
-  policy_config: zod
-    .object({
-      spectral_radius_max: zod
-        .number()
-        .default(createJobBodyPolicyConfigSpectralRadiusMaxDefault),
-      cond_limit: zod
-        .number()
-        .default(createJobBodyPolicyConfigCondLimitDefault),
-      dual_error_tol: zod
-        .number()
-        .default(createJobBodyPolicyConfigDualErrorTolDefault),
-      spectral_tail_tol: zod
-        .number()
-        .default(createJobBodyPolicyConfigSpectralTailTolDefault),
-    })
-    .optional(),
-  model_pool: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
-});
+]);
 
 export const CreateJobResponse = zod.object({
   id: zod.string().uuid(),
+  kind: zod
+    .enum(["numerical", "cutoff_trace"])
+    .describe(
+      "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+    ),
   status: zod.enum([
     "queued",
     "editor_running",
@@ -79,7 +126,11 @@ export const CreateJobResponse = zod.object({
     "complete_with_warnings",
     "failed",
   ]),
-  kernel_params: zod.record(zod.string(), zod.unknown()),
+  kernel_params: zod
+    .record(zod.string(), zod.unknown())
+    .describe(
+      "Job descriptor (numerical kernel params, or cutoff_trace probe specification).",
+    ),
   policy_config: zod.record(zod.string(), zod.unknown()),
   current_artifact_id: zod.string().uuid().nullish(),
   retry_count: zod.number(),
@@ -103,6 +154,11 @@ export const ListJobsResponse = zod.object({
   jobs: zod.array(
     zod.object({
       id: zod.string().uuid(),
+      kind: zod
+        .enum(["numerical", "cutoff_trace"])
+        .describe(
+          "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+        ),
       status: zod.enum([
         "queued",
         "editor_running",
@@ -111,7 +167,11 @@ export const ListJobsResponse = zod.object({
         "complete_with_warnings",
         "failed",
       ]),
-      kernel_params: zod.record(zod.string(), zod.unknown()),
+      kernel_params: zod
+        .record(zod.string(), zod.unknown())
+        .describe(
+          "Job descriptor (numerical kernel params, or cutoff_trace probe specification).",
+        ),
       policy_config: zod.record(zod.string(), zod.unknown()),
       current_artifact_id: zod.string().uuid().nullish(),
       retry_count: zod.number(),
@@ -135,6 +195,11 @@ export const GetJobParams = zod.object({
 export const GetJobResponse = zod
   .object({
     id: zod.string().uuid(),
+    kind: zod
+      .enum(["numerical", "cutoff_trace"])
+      .describe(
+        "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+      ),
     status: zod.enum([
       "queued",
       "editor_running",
@@ -143,7 +208,11 @@ export const GetJobResponse = zod
       "complete_with_warnings",
       "failed",
     ]),
-    kernel_params: zod.record(zod.string(), zod.unknown()),
+    kernel_params: zod
+      .record(zod.string(), zod.unknown())
+      .describe(
+        "Job descriptor (numerical kernel params, or cutoff_trace probe specification).",
+      ),
     policy_config: zod.record(zod.string(), zod.unknown()),
     current_artifact_id: zod.string().uuid().nullish(),
     retry_count: zod.number(),
@@ -209,6 +278,11 @@ export const PatchJobStatusBody = zod.object({
 
 export const PatchJobStatusResponse = zod.object({
   id: zod.string().uuid(),
+  kind: zod
+    .enum(["numerical", "cutoff_trace"])
+    .describe(
+      "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+    ),
   status: zod.enum([
     "queued",
     "editor_running",
@@ -217,7 +291,11 @@ export const PatchJobStatusResponse = zod.object({
     "complete_with_warnings",
     "failed",
   ]),
-  kernel_params: zod.record(zod.string(), zod.unknown()),
+  kernel_params: zod
+    .record(zod.string(), zod.unknown())
+    .describe(
+      "Job descriptor (numerical kernel params, or cutoff_trace probe specification).",
+    ),
   policy_config: zod.record(zod.string(), zod.unknown()),
   current_artifact_id: zod.string().uuid().nullish(),
   retry_count: zod.number(),
@@ -307,6 +385,11 @@ export const PostJobVerdictBody = zod.object({
 
 export const PostJobVerdictResponse = zod.object({
   id: zod.string().uuid(),
+  kind: zod
+    .enum(["numerical", "cutoff_trace"])
+    .describe(
+      "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+    ),
   status: zod.enum([
     "queued",
     "editor_running",
@@ -315,7 +398,11 @@ export const PostJobVerdictResponse = zod.object({
     "complete_with_warnings",
     "failed",
   ]),
-  kernel_params: zod.record(zod.string(), zod.unknown()),
+  kernel_params: zod
+    .record(zod.string(), zod.unknown())
+    .describe(
+      "Job descriptor (numerical kernel params, or cutoff_trace probe specification).",
+    ),
   policy_config: zod.record(zod.string(), zod.unknown()),
   current_artifact_id: zod.string().uuid().nullish(),
   retry_count: zod.number(),

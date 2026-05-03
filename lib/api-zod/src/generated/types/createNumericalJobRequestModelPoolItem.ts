@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type CreateJobRequestModelPoolItem = { [key: string]: unknown };
+export type CreateNumericalJobRequestModelPoolItem = { [key: string]: unknown };
