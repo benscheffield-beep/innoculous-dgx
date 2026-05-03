@@ -1,15 +1,21 @@
 import { eq, sql } from "drizzle-orm";
-import { createHash } from "node:crypto";
 import { db } from "@workspace/db";
 import {
   jobsTable,
   jobArtifactsTable,
   jobDiagnosticsTable,
+  isCutoffArtifact,
   type JobDescriptor,
-  type PolicyConfig,
+  type NumericalDescriptor,
+  type CutoffTraceDescriptor,
+  type ArtifactPayload,
+  type CutoffArtifactPayload,
+  type NumericalArtifactPayload,
 } from "@workspace/db";
 import { runEditor } from "./editor.js";
-import { runVerifier, type PolicyConfig as VerifierPolicy, type Verdict } from "./verifier.js";
+import { runVerifier, type PolicyConfig as VerifierPolicy, type Verdict, computeArtifactHash } from "./verifier.js";
+import { runCutoffEditor } from "./cutoff-editor.js";
+import { runCutoffVerifier } from "./cutoff-verifier.js";
 import type { DiagnosticIssue } from "@workspace/db";
 import { logger } from "../lib/logger.js";
 
@@ -24,22 +30,6 @@ function backoffDelay(retryCount: number): number {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function buildArtifactHash(payload: object): string {
-  function deepCanonical(v: unknown): string {
-    if (v === null || v === undefined) return "null";
-    if (typeof v === "boolean" || typeof v === "number") return JSON.stringify(v);
-    if (typeof v === "string") return JSON.stringify(v);
-    if (Array.isArray(v)) return "[" + v.map(deepCanonical).join(",") + "]";
-    if (typeof v === "object") {
-      const sorted = Object.keys(v as Record<string, unknown>).sort();
-      const pairs = sorted.map(k => `${JSON.stringify(k)}:${deepCanonical((v as Record<string, unknown>)[k])}`);
-      return "{" + pairs.join(",") + "}";
-    }
-    return JSON.stringify(v);
-  }
-  return createHash("sha256").update(deepCanonical(payload)).digest("hex");
 }
 
 async function setStatus(jobId: string, status: string): Promise<void> {
@@ -64,7 +54,24 @@ function applyRemediation(
   issues: DiagnosticIssue[]
 ): { descriptor: JobDescriptor; changed: boolean } {
   const actions = new Set(issues.map(i => i.remediation));
-  let d: JobDescriptor = JSON.parse(JSON.stringify(descriptor)) as JobDescriptor;
+
+  if ((descriptor as CutoffTraceDescriptor).kind === "cutoff_trace") {
+    const d: CutoffTraceDescriptor = JSON.parse(JSON.stringify(descriptor)) as CutoffTraceDescriptor;
+    let changed = false;
+    if (actions.has("re_run_judge_with_higher_temperature_floor")) {
+      const cur = d.judge_temperature ?? 0;
+      d.judge_temperature = Math.min(1, Math.max(0.2, cur + 0.2));
+      changed = true;
+    }
+    if (actions.has("request_more_probes_in_window")) {
+      // Cannot synthesize new probes; lower min coverage to attempt to clear the warn
+      d.cutoff_min_probes_per_month = Math.max(1, (d.cutoff_min_probes_per_month ?? 2) - 1);
+      changed = true;
+    }
+    return { descriptor: d, changed };
+  }
+
+  const d: NumericalDescriptor = JSON.parse(JSON.stringify(descriptor)) as NumericalDescriptor;
   let changed = false;
 
   if (actions.has("apply_damping_to_G_off")) {
@@ -121,10 +128,16 @@ async function runEditorVerifierCycle(
     await sleep(backoffDelay(attemptNumber - 1));
   }
 
-  const editorResult = await runEditor(descriptor);
-  const { artifact } = editorResult;
+  let artifact: ArtifactPayload;
+  if ((descriptor as CutoffTraceDescriptor).kind === "cutoff_trace") {
+    const r = await runCutoffEditor(descriptor as CutoffTraceDescriptor);
+    artifact = r.artifact;
+  } else {
+    const r = await runEditor(descriptor as NumericalDescriptor);
+    artifact = r.artifact;
+  }
 
-  const hash = buildArtifactHash(artifact);
+  const hash = computeArtifactHash(artifact);
   const version = await getNextArtifactVersion(jobId);
 
   const [insertedArtifact] = await db
@@ -139,34 +152,68 @@ async function runEditorVerifierCycle(
     .set({ status: "verifying", currentArtifactId: insertedArtifact.id, updatedAt: new Date() })
     .where(eq(jobsTable.id, jobId));
 
-  const verifierResult = await runVerifier(artifact, hash, policy);
+  let verdict: Verdict;
+  let issues: DiagnosticIssue[];
+  let signed_proof: string;
+  let diagInsert: typeof jobDiagnosticsTable.$inferInsert;
 
-  const [insertedDiag] = await db
-    .insert(jobDiagnosticsTable)
-    .values({
+  if (isCutoffArtifact(artifact)) {
+    const cutoffPayload: CutoffArtifactPayload = artifact;
+    const cutoffDesc = descriptor as CutoffTraceDescriptor;
+    const r = await runCutoffVerifier(cutoffPayload, hash, {
+      policy: {
+        ...(cutoffDesc.judge_disagreement_max !== undefined
+          ? { judge_disagreement_max: cutoffDesc.judge_disagreement_max }
+          : {}),
+        ...(cutoffDesc.cutoff_min_probes_per_month !== undefined
+          ? { min_probes_per_month: cutoffDesc.cutoff_min_probes_per_month }
+          : {}),
+      },
+    });
+    verdict = r.verdict;
+    issues = r.issues;
+    signed_proof = r.signed_proof;
+    diagInsert = {
       jobId,
       artifactId: insertedArtifact.id,
-      spectralRadius: artifact.diagnostics.spectral_radius,
-      condIMinusG: artifact.diagnostics.cond_I_minus_G,
-      dualTruncationError: artifact.diagnostics.dual_truncation_error,
-      spectralTailError: artifact.diagnostics.spectral_tail_error,
-      verdict: verifierResult.verdict,
-      issues: verifierResult.issues,
-    })
-    .returning();
+      spectralRadius: 0,
+      condIMinusG: 0,
+      dualTruncationError: r.recomputed_metrics.judge_disagreement_rate,
+      spectralTailError: r.recomputed_metrics.monotonicity_violation,
+      verdict,
+      issues,
+    };
+  } else {
+    const numPayload: NumericalArtifactPayload = artifact;
+    const r = await runVerifier(numPayload, hash, policy);
+    verdict = r.verdict;
+    issues = r.issues;
+    signed_proof = r.signed_proof;
+    diagInsert = {
+      jobId,
+      artifactId: insertedArtifact.id,
+      spectralRadius: numPayload.diagnostics.spectral_radius,
+      condIMinusG: numPayload.diagnostics.cond_I_minus_G,
+      dualTruncationError: numPayload.diagnostics.dual_truncation_error,
+      spectralTailError: numPayload.diagnostics.spectral_tail_error,
+      verdict,
+      issues,
+    };
+  }
 
+  const [insertedDiag] = await db.insert(jobDiagnosticsTable).values(diagInsert).returning();
   if (!insertedDiag) throw new Error("Failed to insert diagnostics");
 
   await db
     .update(jobArtifactsTable)
-    .set({ signedProof: verifierResult.signed_proof })
+    .set({ signedProof: signed_proof })
     .where(eq(jobArtifactsTable.id, insertedArtifact.id));
 
   return {
-    verdict: verifierResult.verdict,
-    issues: verifierResult.issues,
+    verdict,
+    issues,
     artifactId: insertedArtifact.id,
-    signedProof: verifierResult.signed_proof,
+    signedProof: signed_proof,
   };
 }
 
@@ -197,7 +244,7 @@ export async function runPipeline(jobId: string): Promise<void> {
     }
 
     await setStatus(jobId, "editor_running");
-    logger.info({ jobId }, "Editor pipeline starting");
+    logger.info({ jobId, kind: (job as { kind?: string }).kind }, "Editor pipeline starting");
 
     let descriptor = job.kernelParams as JobDescriptor;
     const policy = (job.policyConfig ?? {}) as Partial<VerifierPolicy>;

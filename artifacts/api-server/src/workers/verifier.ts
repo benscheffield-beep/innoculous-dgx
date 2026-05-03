@@ -1,6 +1,8 @@
 import { createHmac, createHash } from "node:crypto";
-import type { ArtifactPayload } from "@workspace/db";
+import type { NumericalArtifactPayload } from "@workspace/db";
 import type { DiagnosticIssue } from "@workspace/db";
+
+type ArtifactPayload = NumericalArtifactPayload;
 
 export interface PolicyConfig {
   spectral_radius_max: number;
@@ -46,12 +48,14 @@ function deepCanonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function computeArtifactHash(payload: ArtifactPayload): string {
+export function computeArtifactHash(payload: unknown): string {
   const canonical = deepCanonical(payload);
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-function signArtifact(artifactHash: string, recomputedMetrics: object, verdict: Verdict): string {
+export { deepCanonical };
+
+export function signArtifact(artifactHash: string, recomputedMetrics: object, verdict: Verdict): string {
   const signingKey = process.env["VERIFIER_SIGNING_KEY"] ?? "dev-insecure-key-change-in-production";
   const payload = JSON.stringify({
     artifact_hash: artifactHash,
@@ -173,7 +177,7 @@ function chk06Causality(payload: ArtifactPayload): DiagnosticIssue | null {
     };
   }
 
-  const hasFiniteCoeffs = Phi_coeffs.every(v => isFinite(v)) && R_coeffs.every(v => isFinite(v));
+  const hasFiniteCoeffs = Phi_coeffs.every((v: number) => isFinite(v)) && R_coeffs.every((v: number) => isFinite(v));
   if (!hasFiniteCoeffs) {
     return {
       check_id: "CHK06",
@@ -200,16 +204,10 @@ const SENSITIVE_PATTERNS = [
 ];
 
 function chk07Privacy(payload: ArtifactPayload): DiagnosticIssue | null {
-  const ALLOWED_KEYS = new Set([
-    "dual_indices", "F", "S", "Phi_coeffs", "R_coeffs", "U_meta", "diagnostics",
-    "basis", "eigenvalues", "spectral_radius", "cond_I_minus_G",
-    "dual_truncation_error", "spectral_tail_error",
-  ]);
-
   const payloadStr = JSON.stringify(payload);
 
   const TOP_LEVEL_ALLOWED = new Set([
-    "dual_indices", "F", "S", "Phi_coeffs", "R_coeffs", "U_meta", "diagnostics",
+    "kind", "dual_indices", "F", "S", "Phi_coeffs", "R_coeffs", "U_meta", "diagnostics",
   ]);
   const unexpectedTopLevel: string[] = [];
   if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
@@ -282,4 +280,3 @@ export async function runVerifier(
   return { verdict, issues, recomputed_metrics, signed_proof };
 }
 
-export { computeArtifactHash };

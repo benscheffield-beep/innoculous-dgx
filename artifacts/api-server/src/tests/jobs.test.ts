@@ -278,7 +278,7 @@ describe("Fuzz tests – adversarial inputs", () => {
 
   for (const [idx, body] of fuzzCases.entries()) {
     it(`rejects malformed input #${idx}`, async () => {
-      const res = await request(app).post("/api/jobs").send(body);
+      const res = await request(app).post("/api/jobs").send(body as object);
       expect(res.status).toBeGreaterThanOrEqual(400);
       expect(res.status).toBeLessThan(500);
     });

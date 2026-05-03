@@ -10,13 +10,23 @@ export type JobStatus =
   | "complete_with_warnings"
   | "failed";
 
+export type JobKind = "numerical" | "cutoff_trace";
+
 export interface KernelParams {
   type: "gaussian" | "mellin";
   sigma?: number;
   alpha?: number;
 }
 
-export interface JobDescriptor {
+export interface PolicyConfig {
+  spectral_radius_max?: number;
+  cond_limit?: number;
+  dual_error_tol?: number;
+  spectral_tail_tol?: number;
+}
+
+export interface NumericalDescriptor {
+  kind?: "numerical";
   kernel: KernelParams;
   Q: number[][];
   truncation: { M: number; r: number };
@@ -27,15 +37,28 @@ export interface JobDescriptor {
   seed?: number;
 }
 
-export interface PolicyConfig {
-  spectral_radius_max?: number;
-  cond_limit?: number;
-  dual_error_tol?: number;
-  spectral_tail_tol?: number;
+export interface CutoffProbe {
+  question: string;
+  answer: string;
+  date: string;
 }
+
+export interface CutoffTraceDescriptor {
+  kind: "cutoff_trace";
+  model: string;
+  judge_model: string;
+  probes: CutoffProbe[];
+  judge_temperature?: number;
+  judge_disagreement_max?: number;
+  cutoff_min_probes_per_month?: number;
+  seed?: number;
+}
+
+export type JobDescriptor = NumericalDescriptor | CutoffTraceDescriptor;
 
 export const jobsTable = pgTable("jobs", {
   id: uuid("id").primaryKey().defaultRandom(),
+  kind: text("kind").notNull().default("numerical"),
   status: text("status").notNull().default("queued"),
   kernelParams: jsonb("kernel_params").$type<JobDescriptor>().notNull(),
   policyConfig: jsonb("policy_config").$type<PolicyConfig>().notNull().default({}),

@@ -13,7 +13,8 @@ const kernelParamsSchema = z.object({
   alpha: z.number().positive().optional(),
 });
 
-const createJobSchema = z.object({
+const numericalDescriptorSchema = z.object({
+  kind: z.literal("numerical").optional(),
   job_id: z.string().uuid().optional(),
   kernel: kernelParamsSchema,
   Q: z.array(z.array(z.number())).min(1),
@@ -40,9 +41,31 @@ const createJobSchema = z.object({
   seed: z.number().int().optional(),
 });
 
+const cutoffProbeSchema = z.object({
+  question: z.string().min(1),
+  answer: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}(-\d{2})?$/, "date must be YYYY-MM or YYYY-MM-DD"),
+});
+
+const cutoffDescriptorSchema = z.object({
+  kind: z.literal("cutoff_trace"),
+  job_id: z.string().uuid().optional(),
+  model: z.string().min(1),
+  judge_model: z.string().min(1),
+  probes: z.array(cutoffProbeSchema).min(1),
+  judge_temperature: z.number().min(0).max(2).optional(),
+  judge_disagreement_max: z.number().min(0).max(1).optional(),
+  cutoff_min_probes_per_month: z.number().int().positive().optional(),
+  policy_config: z.record(z.unknown()).optional(),
+  seed: z.number().int().optional(),
+});
+
+const createJobSchema = z.union([cutoffDescriptorSchema, numericalDescriptorSchema]);
+
 function serializeJob(job: typeof jobsTable.$inferSelect) {
   return {
     id: job.id,
+    kind: (job as { kind?: string }).kind ?? "numerical",
     status: job.status,
     kernel_params: job.kernelParams,
     policy_config: job.policyConfig,
@@ -88,12 +111,14 @@ router.post("/jobs", async (req, res) => {
   }
 
   const data = parsed.data;
+  const isCutoff = (data as { kind?: string }).kind === "cutoff_trace";
+  const jobId = (data as { job_id?: string }).job_id;
 
-  if (data.job_id) {
+  if (jobId) {
     const [existing] = await db
       .select()
       .from(jobsTable)
-      .where(eq(jobsTable.id, data.job_id))
+      .where(eq(jobsTable.id, jobId))
       .limit(1);
     if (existing) {
       res.status(200).json(serializeJob(existing));
@@ -101,29 +126,18 @@ router.post("/jobs", async (req, res) => {
     }
   }
 
-  const descriptor = {
-    kernel: data.kernel,
-    Q: data.Q,
-    truncation: data.truncation,
-    latency: data.latency,
-    precision: data.precision,
-    policy_config: data.policy_config,
-    model_pool: data.model_pool,
-    seed: data.seed,
+  const { job_id: _omit, policy_config, ...rest } = data as Record<string, unknown> & {
+    job_id?: string;
+    policy_config?: Record<string, unknown>;
   };
+  const descriptor = isCutoff ? { ...rest, kind: "cutoff_trace" } : { kind: "numerical", ...rest };
 
-  const insertValues: Parameters<typeof db.insert>[0] extends never
-    ? never
-    : {
-        status: string;
-        kernelParams: typeof descriptor;
-        policyConfig: NonNullable<typeof data.policy_config>;
-        id?: string;
-      } = {
+  const insertValues = {
+    kind: isCutoff ? "cutoff_trace" : "numerical",
     status: "queued",
-    kernelParams: descriptor,
-    policyConfig: data.policy_config ?? {},
-    ...(data.job_id ? { id: data.job_id } : {}),
+    kernelParams: descriptor as never,
+    policyConfig: (policy_config ?? {}) as never,
+    ...(jobId ? { id: jobId } : {}),
   };
 
   const [inserted] = await db.insert(jobsTable).values(insertValues).returning();
@@ -243,7 +257,7 @@ router.put("/jobs/:id/artifact", async (req, res) => {
     .values({
       jobId: id!,
       version,
-      payload: parsed.data.payload as Parameters<typeof db.insert>[0] extends never ? never : typeof jobArtifactsTable.$inferInsert["payload"],
+      payload: parsed.data.payload as never,
       hash: parsed.data.hash,
     })
     .returning();

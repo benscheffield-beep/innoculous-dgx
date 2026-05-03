@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { runVerifier, computeArtifactHash, DEFAULT_POLICY } from "../workers/verifier.js";
-import type { ArtifactPayload } from "@workspace/db";
+import type { NumericalArtifactPayload as ArtifactPayload } from "@workspace/db";
 
 function makeValidPayload(overrides: Partial<ArtifactPayload> = {}): ArtifactPayload {
   return {

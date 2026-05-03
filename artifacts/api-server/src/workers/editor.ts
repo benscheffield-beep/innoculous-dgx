@@ -18,8 +18,7 @@ import {
   topEigenvectors,
   gramSchmidt,
 } from "../lib/math.js";
-import type { KernelParams, JobDescriptor } from "@workspace/db";
-import type { ArtifactPayload } from "@workspace/db";
+import type { KernelParams, NumericalDescriptor as JobDescriptor, NumericalArtifactPayload as ArtifactPayload } from "@workspace/db";
 
 export interface EditorResult {
   artifact: ArtifactPayload;
