@@ -1,7 +1,14 @@
 import { Router } from "express";
 import { eq, count, sql } from "drizzle-orm";
 import { z } from "zod";
-import { db, jobsTable, jobArtifactsTable, jobDiagnosticsTable } from "@workspace/db";
+import {
+  db,
+  jobsTable,
+  jobArtifactsTable,
+  jobDiagnosticsTable,
+  type JobDescriptor,
+  type PolicyConfig,
+} from "@workspace/db";
 import { runPipeline, retryPipeline } from "../workers/pipeline.js";
 import { logger } from "../lib/logger.js";
 
@@ -133,11 +140,11 @@ router.post("/jobs", async (req, res) => {
   };
   const descriptor = isCutoff ? { ...rest, kind: "cutoff_trace" } : { kind: "numerical", ...rest };
 
-  const insertValues = {
+  const insertValues: typeof jobsTable.$inferInsert = {
     kind: isCutoff ? "cutoff_trace" : "numerical",
     status: "queued",
-    kernelParams: descriptor as never,
-    policyConfig: (policy_config ?? {}) as never,
+    kernelParams: descriptor as JobDescriptor,
+    policyConfig: (policy_config ?? {}) as PolicyConfig,
     ...(jobId ? { id: jobId } : {}),
   };
 
