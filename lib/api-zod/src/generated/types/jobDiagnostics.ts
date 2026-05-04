@@ -16,6 +16,12 @@ export interface JobDiagnostics {
   cond_i_minus_g: number;
   dual_truncation_error: number;
   spectral_tail_error: number;
+  /** numerical CHK08 — relative ||F − F̃|| / ||F̃|| against the closed-form Warburg oracle (null when oracle does not apply) */
+  closed_form_residual?: number | null;
+  /** log-log slope of the half-integration eigenvalues (target ≈ -1) */
+  mercer_slope?: number | null;
+  /** Warburg ν index (= 1 - d/2 for s = 1) used by the closed-form Bessel oracle */
+  warburg_nu?: number | null;
   verdict: JobDiagnosticsVerdict;
   issues: DiagnosticIssue[];
   created_at: Date;

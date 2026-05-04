@@ -403,6 +403,24 @@ export const GetJobResponse = zod
           cond_i_minus_g: zod.number(),
           dual_truncation_error: zod.number(),
           spectral_tail_error: zod.number(),
+          closed_form_residual: zod
+            .number()
+            .nullish()
+            .describe(
+              "numerical CHK08 — relative ||F − F̃|| \/ ||F̃|| against the closed-form Warburg oracle (null when oracle does not apply)",
+            ),
+          mercer_slope: zod
+            .number()
+            .nullish()
+            .describe(
+              "log-log slope of the half-integration eigenvalues (target ≈ -1)",
+            ),
+          warburg_nu: zod
+            .number()
+            .nullish()
+            .describe(
+              "Warburg ν index (= 1 - d\/2 for s = 1) used by the closed-form Bessel oracle",
+            ),
           verdict: zod.enum(["pass", "warn", "fail"]),
           issues: zod.array(
             zod.object({
@@ -623,3 +641,66 @@ export const PostJobVerdictResponse = zod.object({
   created_at: zod.coerce.date(),
   updated_at: zod.coerce.date(),
 });
+
+/**
+ * Re-runs the pipeline for an existing job (resets retry counter and re-dispatches to Editor).
+ * @summary Retry a job
+ */
+export const RetryJobParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const RetryJobResponse = zod.object({
+  id: zod.string().uuid(),
+  kind: zod
+    .enum(["numerical", "cutoff_trace"])
+    .describe(
+      "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+    ),
+  status: zod.enum([
+    "queued",
+    "editor_running",
+    "verifying",
+    "complete",
+    "complete_with_warnings",
+    "failed",
+  ]),
+  kernel_params: zod
+    .record(zod.string(), zod.unknown())
+    .describe(
+      "Job descriptor (numerical kernel params, or cutoff_trace probe specification).",
+    ),
+  policy_config: zod.record(zod.string(), zod.unknown()),
+  current_artifact_id: zod.string().uuid().nullish(),
+  retry_count: zod.number(),
+  created_at: zod.coerce.date(),
+  updated_at: zod.coerce.date(),
+});
+
+/**
+ * Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards.
+ * @summary Job stats summary
+ */
+export const GetJobStatsResponse = zod
+  .object({
+    total: zod.number(),
+    by_status: zod
+      .record(zod.string(), zod.number())
+      .describe(
+        "Map of status → count (queued, editor_running, verifying, complete, complete_with_warnings, failed)",
+      ),
+    by_kind: zod
+      .record(zod.string(), zod.number())
+      .describe("Map of job kind → count (numerical, cutoff_trace)"),
+    by_verdict: zod
+      .record(zod.string(), zod.number())
+      .describe(
+        "Map of verdict → count among completed jobs (pass, warn, fail)",
+      ),
+    recent_24h: zod
+      .number()
+      .describe("Number of jobs created in the last 24 hours"),
+  })
+  .describe(
+    "Aggregate counts across all jobs, useful for dashboard summaries.",
+  );

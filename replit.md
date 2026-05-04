@@ -59,7 +59,8 @@ Parallel CHK01–CHK07 checks with HMAC-SHA256 signed verdict:
 ```
 POST /api/jobs              — create job (idempotent via job_id)
 GET  /api/jobs              — list jobs (paginated)
-GET  /api/jobs/:id          — job detail with artifact + diagnostics
+GET  /api/jobs/stats        — aggregate counts by status / kind / verdict + recent_24h
+GET  /api/jobs/:id          — job detail with artifact + diagnostics (Warburg fields merged from artifact.payload.diagnostics)
 PATCH /api/jobs/:id/status  — update status
 PUT   /api/jobs/:id/artifact — upload artifact
 POST /api/jobs/:id/work     — dispatch to Editor
@@ -67,6 +68,19 @@ POST /api/jobs/:id/verify   — dispatch to Verifier
 POST /api/jobs/:id/verdict  — post Verifier verdict
 POST /api/jobs/:id/retry    — retry failed job
 ```
+
+## Frontend: `artifacts/innoculus-web`
+
+React 19 + Vite 7 + TanStack Query app mounted at `/`. Calls the api-server at `/api`. Pages (wouter):
+
+- `/` Dashboard — `useGetJobStats` + `useListJobs` for tiles and Recent Activity.
+- `/submit` Submit — react-hook-form + Zod, two tabs (Numerical / Cutoff Trace).
+- `/jobs` All Jobs — paginated registry with filters.
+- `/jobs/:id` Detail — pipeline stepper, Verifier checks, artifact viewer, Retry button. `useGetJob` polls every 2.5s while status ∈ {queued, editor_running, verifying} and stops on terminal.
+
+Mode toggle: User vs Developer is a global React context (`src/lib/mode-context.tsx`), persisted to localStorage as `innoculus-mode`. User Mode hides truncation/latency/precision/policy fields and surfaces prose in diagnostics; Developer Mode reveals every metric including the Warburg trio (`closed_form_residual`, `mercer_slope`, `warburg_nu`).
+
+Theme: dark only. Plus Jakarta Sans + Space Mono. **Important**: any `@import url(...)` (e.g. Google Fonts) MUST be the very first line of `src/index.css` — before `@import "tailwindcss"` — otherwise PostCSS silently drops it.
 
 ## Key Commands
 
@@ -76,6 +90,7 @@ POST /api/jobs/:id/retry    — retry failed job
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 - `pnpm --filter @workspace/api-server run test` — run unit + integration tests (51 tests)
+- `pnpm --filter @workspace/innoculus-web run dev` — run frontend dev server
 
 ## Key Files
 

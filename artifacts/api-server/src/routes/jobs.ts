@@ -184,6 +184,49 @@ router.get("/jobs", async (req, res) => {
   });
 });
 
+router.get("/jobs/stats", async (_req, res) => {
+  const totalRows = await db.select({ n: count() }).from(jobsTable);
+  const statusRows = await db
+    .select({ status: jobsTable.status, n: count() })
+    .from(jobsTable)
+    .groupBy(jobsTable.status);
+  const kindRows = await db
+    .select({ kind: jobsTable.kind, n: count() })
+    .from(jobsTable)
+    .groupBy(jobsTable.kind);
+  // Count one verdict per job (the verdict on the job's CURRENT artifact),
+  // not one per diagnostics row — otherwise retried jobs are double-counted.
+  const verdictRows = await db
+    .select({ verdict: jobDiagnosticsTable.verdict, n: count() })
+    .from(jobsTable)
+    .innerJoin(
+      jobDiagnosticsTable,
+      eq(jobDiagnosticsTable.artifactId, jobsTable.currentArtifactId),
+    )
+    .groupBy(jobDiagnosticsTable.verdict);
+  const recentRows = await db
+    .select({ n: count() })
+    .from(jobsTable)
+    .where(sql`${jobsTable.createdAt} >= NOW() - INTERVAL '24 hours'`);
+
+  const by_status: Record<string, number> = {};
+  for (const row of statusRows) by_status[row.status] = Number(row.n);
+  const by_kind: Record<string, number> = {};
+  for (const row of kindRows) by_kind[row.kind ?? "numerical"] = Number(row.n);
+  const by_verdict: Record<string, number> = {};
+  for (const row of verdictRows) {
+    if (row.verdict) by_verdict[row.verdict] = Number(row.n);
+  }
+
+  res.json({
+    total: Number(totalRows[0]?.n ?? 0),
+    by_status,
+    by_kind,
+    by_verdict,
+    recent_24h: Number(recentRows[0]?.n ?? 0),
+  });
+});
+
 router.get("/jobs/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -209,7 +252,30 @@ router.get("/jobs/:id", async (req, res) => {
       .from(jobDiagnosticsTable)
       .where(eq(jobDiagnosticsTable.artifactId, job.currentArtifactId))
       .limit(1);
-    if (diag) diagnostics = serializeDiagnostics(diag);
+    if (diag) {
+      diagnostics = serializeDiagnostics(diag);
+      // Warburg fields are computed in the Editor and persisted to the
+      // artifact payload (see editor.ts ~line 410). The flat job_diagnostics
+      // row doesn't carry them, so merge them onto the response so the
+      // frontend can render closed_form_residual / mercer_slope / warburg_nu
+      // without a second fetch or schema migration.
+      const payloadDiag = (art?.payload as { diagnostics?: Record<string, unknown> } | undefined)?.diagnostics;
+      if (payloadDiag) {
+        const closed = payloadDiag.closed_form_residual;
+        const slope = payloadDiag.mercer_slope;
+        const nu = payloadDiag.warburg_nu;
+        diagnostics = {
+          ...diagnostics,
+          closed_form_residual: typeof closed === "number" ? closed : null,
+          mercer_slope: typeof slope === "number" ? slope : null,
+          warburg_nu: typeof nu === "number" ? nu : null,
+        } as typeof diagnostics & {
+          closed_form_residual: number | null;
+          mercer_slope: number | null;
+          warburg_nu: number | null;
+        };
+      }
+    }
   }
 
   res.json({ ...serializeJob(job), artifact, diagnostics });

@@ -282,6 +282,12 @@ export interface JobDiagnostics {
   cond_i_minus_g: number;
   dual_truncation_error: number;
   spectral_tail_error: number;
+  /** numerical CHK08 — relative ||F − F̃|| / ||F̃|| against the closed-form Warburg oracle (null when oracle does not apply) */
+  closed_form_residual?: number | null;
+  /** log-log slope of the half-integration eigenvalues (target ≈ -1) */
+  mercer_slope?: number | null;
+  /** Warburg ν index (= 1 - d/2 for s = 1) used by the closed-form Bessel oracle */
+  warburg_nu?: number | null;
   verdict: JobDiagnosticsVerdict;
   issues: DiagnosticIssue[];
   created_at: string;
@@ -291,6 +297,36 @@ export type JobDetail = Job & {
   artifact?: JobArtifact;
   diagnostics?: JobDiagnostics;
 };
+
+/**
+ * Map of status → count (queued, editor_running, verifying, complete, complete_with_warnings, failed)
+ */
+export type JobStatsByStatus = { [key: string]: number };
+
+/**
+ * Map of job kind → count (numerical, cutoff_trace)
+ */
+export type JobStatsByKind = { [key: string]: number };
+
+/**
+ * Map of verdict → count among completed jobs (pass, warn, fail)
+ */
+export type JobStatsByVerdict = { [key: string]: number };
+
+/**
+ * Aggregate counts across all jobs, useful for dashboard summaries.
+ */
+export interface JobStats {
+  total: number;
+  /** Map of status → count (queued, editor_running, verifying, complete, complete_with_warnings, failed) */
+  by_status: JobStatsByStatus;
+  /** Map of job kind → count (numerical, cutoff_trace) */
+  by_kind: JobStatsByKind;
+  /** Map of verdict → count among completed jobs (pass, warn, fail) */
+  by_verdict: JobStatsByVerdict;
+  /** Number of jobs created in the last 24 hours */
+  recent_24h: number;
+}
 
 export interface PaginatedJobsResponse {
   jobs: Job[];

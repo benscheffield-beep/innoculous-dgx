@@ -266,6 +266,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /jobs/{id}/retry:
+    post:
+      operationId: retryJob
+      tags: [jobs]
+      summary: Retry a job
+      description: Re-runs the pipeline for an existing job (resets retry counter and re-dispatches to Editor).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Retry dispatched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/stats:
+    get:
+      operationId: getJobStats
+      tags: [jobs]
+      summary: Job stats summary
+      description: Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards.
+      responses:
+        "200":
+          description: Stats snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStats"
+
 components:
   schemas:
     HealthStatus:
@@ -611,6 +652,18 @@ components:
           type: number
         spectral_tail_error:
           type: number
+        closed_form_residual:
+          type: number
+          nullable: true
+          description: numerical CHK08 — relative ||F − F̃|| / ||F̃|| against the closed-form Warburg oracle (null when oracle does not apply)
+        mercer_slope:
+          type: number
+          nullable: true
+          description: log-log slope of the half-integration eigenvalues (target ≈ -1)
+        warburg_nu:
+          type: number
+          nullable: true
+          description: Warburg ν index (= 1 - d/2 for s = 1) used by the closed-form Bessel oracle
         verdict:
           type: string
           enum: [pass, warn, fail]
@@ -622,6 +675,32 @@ components:
           type: string
           format: date-time
       required: [id, job_id, artifact_id, spectral_radius, cond_i_minus_g, dual_truncation_error, spectral_tail_error, verdict, issues, created_at]
+
+    JobStats:
+      type: object
+      description: Aggregate counts across all jobs, useful for dashboard summaries.
+      properties:
+        total:
+          type: integer
+        by_status:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Map of status → count (queued, editor_running, verifying, complete, complete_with_warnings, failed)
+        by_kind:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Map of job kind → count (numerical, cutoff_trace)
+        by_verdict:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Map of verdict → count among completed jobs (pass, warn, fail)
+        recent_24h:
+          type: integer
+          description: Number of jobs created in the last 24 hours
+      required: [total, by_status, by_kind, by_verdict, recent_24h]
 
     DiagnosticIssue:
       type: object

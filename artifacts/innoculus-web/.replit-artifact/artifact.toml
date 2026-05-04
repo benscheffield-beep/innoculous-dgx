@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Innoculus"
+version = "1.0.0"
+id = "artifacts/innoculus-web"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21504
+
+[services.development]
+run = "pnpm --filter @workspace/innoculus-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/innoculus-web", "run", "build" ]
+publicDir = "artifacts/innoculus-web/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21504"
+BASE_PATH = "/"
