@@ -3,6 +3,31 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+/* Innoculus splash — Goldstone-diagram animations */
+@keyframes innoculus-flow {
+  to { stroke-dashoffset: -160; }
+}
+@keyframes innoculus-pulse-stroke {
+  0%, 100% { stroke-opacity: 0.35; }
+  50%      { stroke-opacity: 0.85; }
+}
+@keyframes innoculus-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); transform-origin: center; transform-box: fill-box; }
+  50%      { opacity: 1;    transform: scale(1.18); }
+}
+@keyframes innoculus-core {
+  0%, 100% { opacity: 0.85; transform: scale(1); transform-origin: center; transform-box: fill-box; }
+  50%      { opacity: 1;    transform: scale(1.25); }
+}
+@keyframes innoculus-radiate {
+  0%   { r: 14; stroke-opacity: 0.8; }
+  100% { r: 64; stroke-opacity: 0;   }
+}
+@keyframes innoculus-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

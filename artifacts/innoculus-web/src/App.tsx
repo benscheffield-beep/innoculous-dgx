@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ModeProvider } from "@/lib/mode-context";
 import { Layout } from "@/components/layout";
 import NotFound from "@/pages/not-found";
+import Splash from "@/pages/splash";
 import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
 import JobDetail from "@/pages/job-detail";
@@ -12,17 +13,32 @@ import Submit from "@/pages/submit";
 
 const queryClient = new QueryClient();
 
+function ShellRoute({ children }: { children: React.ReactNode }) {
+  return <Layout>{children}</Layout>;
+}
+
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/submit" component={Submit} />
-        <Route path="/jobs" component={Jobs} />
-        <Route path="/jobs/:id" component={JobDetail} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      {/* Splash is a fullscreen entry portal — NO sidebar layout */}
+      <Route path="/" component={Splash} />
+      {/* All other routes share the dashboard shell */}
+      <Route path="/dashboard">
+        <ShellRoute><Dashboard /></ShellRoute>
+      </Route>
+      <Route path="/submit">
+        <ShellRoute><Submit /></ShellRoute>
+      </Route>
+      <Route path="/jobs">
+        <ShellRoute><Jobs /></ShellRoute>
+      </Route>
+      <Route path="/jobs/:id">
+        <ShellRoute><JobDetail /></ShellRoute>
+      </Route>
+      <Route>
+        <ShellRoute><NotFound /></ShellRoute>
+      </Route>
+    </Switch>
   );
 }
 

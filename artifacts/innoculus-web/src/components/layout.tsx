@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Link, useLocation } from "wouter";
 import { useMode } from "@/lib/mode-context";
 import { useHealthCheck, getHealthCheckQueryKey } from "@workspace/api-client-react";
@@ -35,17 +35,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border bg-card/50 flex flex-col">
         <div className="p-6 border-b border-border flex items-center justify-between md:justify-start gap-3">
-          <div className="flex items-center gap-2 text-primary">
+          <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity" data-testid="link-home">
             <Activity className="w-5 h-5" />
             <span className="font-bold tracking-tight text-lg">Innoculus</span>
-          </div>
+          </Link>
           <div className="md:hidden">
             <HealthIndicator />
           </div>
         </div>
 
         <nav className="flex-1 p-4 flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-visible">
-          <Link href="/" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${location === "/" ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"}`} data-testid="link-nav-dashboard">
+          <Link href="/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${location === "/dashboard" ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"}`} data-testid="link-nav-dashboard">
             <LayoutDashboard className="w-4 h-4" />
             <span className="font-medium text-sm">Dashboard</span>
           </Link>
