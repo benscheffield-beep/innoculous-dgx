@@ -1,4 +1,5 @@
 import {
+  besselK,
   mercerHalfIntegrationBasis,
   validatePhase1,
   validatePhase2,
@@ -24,22 +25,48 @@ const SELF_TEST_PARAMS: WarburgParams = {
 };
 
 const MERCER_SLOPE_TOL = 0.4;
+const BESSEL_K_HALF_TOL = 1e-10;
+
+export interface BesselSpotCheck {
+  measured: number;
+  expected: number;
+  abs_error: number;
+  pass: boolean;
+}
 
 export interface WarburgSelfTestResult {
   ok: boolean;
   mercer_slope: number;
+  bessel_k_half: BesselSpotCheck;
   phases: PhaseResult[];
 }
 
 /**
- * Run all five Warburg phase validators plus the Mercer half-integration
- * slope check exactly once. These are pure-math identities that depend only
- * on the implementation, not on any per-job input, so they belong at startup
- * — not in the per-job Verifier. Returns a structured result so callers can
- * decide whether to log, abort, or both.
+ * Run all five Warburg phase validators, the Mercer half-integration slope
+ * check, and a closed-form spot-check on the modified Bessel function K_ν
+ * exactly once. These are pure-math identities — they depend only on the
+ * implementation of `warburg.ts`, not on any per-job input — so they belong
+ * at startup, not in the per-job Verifier. Returns a structured result so
+ * callers can decide whether to log, abort, or both.
+ *
+ * The Bessel spot-check uses K_{1/2}(z) = √(π/(2z)) · e^(−z) at z = 1, which
+ * exercises the underlying `besselK` routine that drives the Warburg oracle's
+ * closed-form integral; we want CHK08 to silently agree with the analytic
+ * truth at boot, before any job uses it.
  */
 export function runWarburgSelfTest(): WarburgSelfTestResult {
   const mercer = mercerHalfIntegrationBasis(0.5, 60, 10);
+
+  const besselExpected = Math.sqrt(Math.PI / 2) * Math.exp(-1);
+  const besselMeasured = besselK(0.5, 1.0);
+  const besselAbsError = Math.abs(besselMeasured - besselExpected);
+  const besselSpot: BesselSpotCheck = {
+    measured: besselMeasured,
+    expected: besselExpected,
+    abs_error: besselAbsError,
+    pass: isFinite(besselMeasured) && besselAbsError < BESSEL_K_HALF_TOL,
+  };
+
   const phases: PhaseResult[] = [
     validatePhase1(0.5, 1e10),
     validatePhase2(SELF_TEST_PARAMS),
@@ -50,8 +77,9 @@ export function runWarburgSelfTest(): WarburgSelfTestResult {
   const ok =
     phases.every((p) => p.pass) &&
     isFinite(mercer.slope) &&
-    Math.abs(mercer.slope + 1) < MERCER_SLOPE_TOL;
-  return { ok, mercer_slope: mercer.slope, phases };
+    Math.abs(mercer.slope + 1) < MERCER_SLOPE_TOL &&
+    besselSpot.pass;
+  return { ok, mercer_slope: mercer.slope, bessel_k_half: besselSpot, phases };
 }
 
 /**
@@ -64,6 +92,7 @@ export function assertWarburgSelfTest(logger: Logger): void {
     logger.error(
       {
         mercer_slope: result.mercer_slope,
+        bessel_k_half: result.bessel_k_half,
         phases: result.phases.map((p) => ({
           phase: p.phase,
           pass: p.pass,
@@ -79,6 +108,7 @@ export function assertWarburgSelfTest(logger: Logger): void {
   logger.info(
     {
       mercer_slope: result.mercer_slope,
+      bessel_k_half_abs_error: result.bessel_k_half.abs_error,
       phases: result.phases.map((p) => p.message),
     },
     "Warburg startup self-test passed",

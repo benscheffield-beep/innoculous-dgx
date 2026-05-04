@@ -452,7 +452,13 @@ A typical pass yields `closed_form_residual ≈ 1e−10` (Bessel quadrature prec
 
 For non-gaussian kernels, `computeWarburgOracle` returns nulls and CHK08 silently skips — preserving the existing pipeline unchanged.
 
-**Startup self-test.** The remaining theorem identities — the five phase validators (envelope slope = −α, latency cancellation `K(T_now − δ) = 0`, integrability `ν < 1`, Warburg-pole `ν = 1/2`, Mercer slope ≈ −1) — are pure-math cross-checks that depend only on the implementation, not on any per-job input. They run exactly once at server boot via `assertWarburgSelfTest(logger)` in `src/index.ts`; the server refuses to start (and logs a structured error) if any of them fails. This catches numerical-library regressions at deploy time without polluting per-job diagnostics.
+**Startup self-test.** A small, fixed set of pure-math identities from `warburg.ts` — and *only* those — runs exactly once at server boot via `assertWarburgSelfTest(logger)` in `src/index.ts`:
+
+- the five phase validators (envelope slope = −α, latency cancellation `K(T_now − δ) = 0`, integrability `ν < 1`, Warburg-pole `ν = 1/2`, Mercer slope ≈ −1);
+- the Mercer half-integration log-log slope on a 60-pt grid;
+- a single Bessel spot-check `K_{1/2}(1) = √(π/2)·e^(−1)` (`abs_error < 1e−10`) to prove the underlying `besselK` routine that drives CHK08 agrees with its analytic closed form.
+
+The server refuses to start (and logs a structured error) if any of them fails. This is a deploy-time smoke test for the Warburg oracle module specifically — it does **not** exercise `lib/math.ts`, the dual-index machinery, the spectral solve, or any other part of the numerical pipeline. Those are covered by the unit-test suite (`pnpm --filter @workspace/api-server test`); the self-test exists to catch a regression in the closed-form oracle before any job runs through it.
 
 ---
 
