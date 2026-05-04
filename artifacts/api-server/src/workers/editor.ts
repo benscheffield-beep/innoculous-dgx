@@ -22,6 +22,7 @@ import {
   fMuClosedForm,
   type WarburgParams,
 } from "../lib/warburg.js";
+import { logger } from "../lib/logger.js";
 import type { KernelParams, NumericalDescriptor as JobDescriptor, NumericalArtifactPayload as ArtifactPayload } from "@workspace/db";
 
 export interface EditorResult {
@@ -431,6 +432,10 @@ function computeWarburgOracle(
   if (descriptor.kernel.type !== "gaussian") {
     return { nu: null, residual: null };
   }
+  // Sigma default MUST match `buildK0` above (line ~33) and the spectral path
+  // (line ~132), all of which use `kernel.sigma ?? 1.0`. If you change one,
+  // change all three — otherwise sigma-less jobs will produce a misleading
+  // closed_form_residual.
   const sigma = descriptor.kernel.sigma ?? 1.0;
   // Editor's k0(t) for "gaussian" is exp(-σ²t), so in the Warburg parameterization
   //   k0(t) = t^(s-1) e^(-π a² t)
@@ -455,16 +460,49 @@ function computeWarburgOracle(
 
   // Compute residual on non-zero modes only — μ=0 uses a separate integrand
   // in the editor (one extra power of t for integrability).
+  //
+  // We track three skip counts so a silent NaN sweep can't make CHK08 quietly
+  // pass on a tiny subset:
+  //   - nonFiniteCount: K_ν blew up (overflow/underflow/NaN). Most often this
+  //     is the large-z underflow path: K_ν(z) ~ √(π/2z)·e^(−z) underflows
+  //     to 0 around z ≈ 745 in float64, and 2√(AB) can reach that range for
+  //     wide kernels. When this happens for a non-trivial fraction of modes
+  //     the residual is computed over a small subset and is misleading.
+  //   - zeroOracleCount: oracle returned exactly 0 (rare; usually only the
+  //     trivial μ=0 mode, which we already skip).
   let sumDiff2 = 0;
   let sumF2 = 0;
+  let totalNonZero = 0;
+  let nonFiniteCount = 0;
+  let zeroOracleCount = 0;
   for (const mu of dualIndices) {
     if (mu.every(v => v === 0)) continue;
+    totalNonZero++;
     const key = mu.join(",");
     const fNum = Fmap.get(key) ?? 0;
     const fOracle = fMuClosedForm(mu, params);
-    if (!isFinite(fOracle)) continue;
+    if (!isFinite(fOracle)) {
+      nonFiniteCount++;
+      continue;
+    }
+    if (fOracle === 0) {
+      zeroOracleCount++;
+    }
     sumDiff2 += (fNum - fOracle) ** 2;
     sumF2 += fOracle * fOracle;
+  }
+  if (nonFiniteCount > 0 || zeroOracleCount > 0) {
+    logger.warn(
+      {
+        total_nonzero_modes: totalNonZero,
+        non_finite_skips: nonFiniteCount,
+        zero_oracle_modes: zeroOracleCount,
+        non_finite_fraction: totalNonZero > 0 ? nonFiniteCount / totalNonZero : 0,
+        d,
+        sigma,
+      },
+      "Warburg oracle skipped modes during residual computation — CHK08 may underreport drift",
+    );
   }
   const residual =
     sumF2 > 1e-30 ? Math.sqrt(sumDiff2 / sumF2) : null;

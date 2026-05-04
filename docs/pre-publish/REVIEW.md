@@ -130,6 +130,7 @@ Net: **net 106 lines smaller** despite adding the self-test module — the dead 
 | Schema migration risk                  | None       | None   | All new fields live inside existing JSON columns, fully optional                     |
 | Backward compatibility                 | None       | None   | Old clients ignore unknown diagnostic keys; `policyConfigSchema` is `.passthrough`   |
 | Dead config field rejected by zod      | None       | None   | `warburg_kernel_cutoff_tol` and `mercer_slope_tol` removed from zod with `.passthrough` so old payloads still parse |
+| Large-z underflow in K_ν (CHK08 false pass) | Unknown — depends on workload | Medium | `K_ν(z) ~ √(π/2z)·e^(−z)` underflows to 0 around `z ≈ 745` in float64; if `2√(AB)` reaches that range on real jobs the residual would compare 0 against 0 and CHK08 would silently pass. Mitigated this turn by counting non-finite oracle skips and emitting a `logger.warn` line with the skip fraction whenever any mode is skipped. Tracked in `FOLLOWUPS.md` for a hard-fail behaviour decision once we have production telemetry on real μᵀQ⁻¹μ magnitudes. |
 
 ---
 

@@ -12,12 +12,13 @@ The backend pipeline is implemented end-to-end and verified by automated tests. 
 |---|---|---|
 | Manager (REST gateway) | **Complete** | 9 endpoints in `artifacts/api-server/src/routes/jobs.ts` |
 | Editor (12-step numerical pipeline) | **Complete** | `artifacts/api-server/src/workers/editor.ts` |
-| Verifier (CHK01–CHK07 + HMAC) | **Complete** | `artifacts/api-server/src/workers/verifier.ts` |
+| Verifier (CHK01–CHK08 + HMAC) | **Complete** | `artifacts/api-server/src/workers/verifier.ts` |
+| Warburg closed-form oracle + startup self-test | **Complete** | `artifacts/api-server/src/lib/warburg.ts`, `artifacts/api-server/src/lib/warburg-self-test.ts` |
 | Pipeline orchestration with auto-retry + backoff | **Complete** | `artifacts/api-server/src/workers/pipeline.ts` |
 | Remediation dispatching (warn/fail → adjusted descriptor → retry) | **Complete** | `applyRemediation()` in `pipeline.ts` |
 | Database schema (jobs, job_artifacts, job_diagnostics) | **Complete and pushed** | `lib/db/src/schema/` |
 | OpenAPI spec + generated client | **Complete** | `lib/api-spec/openapi.yaml`, `lib/api-client-react/src/generated/` |
-| Test suite | **90 tests passing** | `math.test.ts` (18), `pipeline.test.ts` (17), `verifier.test.ts` (16), `jobs.test.ts` (39) |
+| Test suite | **132 tests passing** | `math.test.ts` (18), `pipeline.test.ts` (17), `verifier.test.ts` (16), `warburg.test.ts` (25), `cutoff-editor.test.ts` (11), `cutoff-verifier.test.ts` (5), `jobs.test.ts` (29 + fuzz cases) |
 | Frontend UI (User Mode + Developer Mode) | **Not started** | Tracked as follow-up task #7 |
 | Persistent job queue (survives restarts) | **Not started** | Tracked as follow-up task #8 |
 
