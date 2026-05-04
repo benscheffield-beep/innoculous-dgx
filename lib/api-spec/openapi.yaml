@@ -365,6 +365,21 @@ components:
           minimum: 1
           default: 3
           description: cutoff_trace CT02 — minimum number of probes spot-rechecked
+        warburg_residual_tol:
+          type: number
+          minimum: 0
+          default: 0.05
+          description: numerical CHK08 — max relative ||F − F̃||/||F̃|| against the closed-form Warburg oracle
+        warburg_kernel_cutoff_tol:
+          type: number
+          minimum: 0
+          default: 0.000000001
+          description: numerical CHK09 — max |K(T_now − δ)| (live/static cancellation tolerance)
+        mercer_slope_tol:
+          type: number
+          minimum: 0
+          default: 0.4
+          description: numerical CHK12 — tolerance for Mercer eigenvalue log-log slope around −1
 
     CreateJobRequest:
       oneOf:

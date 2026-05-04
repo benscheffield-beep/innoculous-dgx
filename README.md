@@ -367,6 +367,11 @@ All 7 checks run in parallel (`parallel_checks: true`). Maximum runtime budget: 
 | CHK05 | `spectral_tail_check` | `spectral_tail_estimate ≤ policy.spectral_tail_tol` | warn | Recommend increasing spectral rank `r` |
 | CHK06 | `causality_check` | Retarded/advanced decomposition correct; `iε` prescription applied | **fail** | Reject; recompute with corrected prescription |
 | CHK07 | `privacy_check` | No sensitive tokens or raw user data embedded in artifact payload | **fail** | Reject; sanitize and recompute |
+| CHK08 | `closed_form_residual` | `‖F − F̃‖ / ‖F̃‖ ≤ policy.warburg_residual_tol` | warn | Recommend increase of register bits `b` |
+| CHK10 | `warburg_integrability` | Warburg `ν < 1` (second descent integrable) | warn | Recommend reducing dimension `d` |
+| CHK12 | `mercer_slope` | Mercer eigenvalue log-log slope ≈ −1 ± `policy.mercer_slope_tol` | warn | Recommend increasing spectral rank `r` |
+
+CHK08, CHK10, and CHK12 are populated by the closed-form Warburg oracle described in §8c. They no-op (skip with no diagnostic) when the kernel falls outside the oracle's domain (e.g. non-gaussian). Two additional Warburg quantities (`warburg_nu` and `kernel_cutoff_value`) are stored as informational diagnostics only — they have no associated check because both are determined by construction (ν depends only on `d`, and `K(T_now − δ)` is identically zero by the latency factor's definition).
 
 **Verdict rules:**
 
@@ -427,6 +432,29 @@ OpenAI calls go through `artifacts/api-server/src/lib/openai-client.ts`, which r
 **Diagnostics row mapping:** `dual_truncation_error` = judge disagreement rate, `spectral_tail_error` = monotonicity violation count, `cond_I_minus_G` and `spectral_radius` are stored as `0` sentinels (not meaningful for this kind).
 
 **Artifact payload shape** is stored under the same `job_artifacts.payload` JSON column with `kind: "cutoff_trace"`. The `cutoff_estimate` field returns `{ month, ci_low, ci_high, fit_quality }` in `YYYY-MM` form.
+
+---
+
+## 8c. Warburg Closed-Form Oracle
+
+The numerical Editor is paired with a closed-form **reference oracle** (`src/lib/warburg.ts`) that ports the unified Warburg theorem into TypeScript. For the gaussian kernel the oracle evaluates the lattice integral analytically via the modified Bessel identity
+
+  ∫₀^∞ t^(ν−1) e^(−A t − B/t) dt = 2 (B/A)^(ν/2) K_ν(2 √(A B))
+
+with `A = σ²`, `B = π μᵀ Q⁻¹ μ`, and `ν = 1 − d/2`. K_{1/2} uses its exact closed form `√(π/(2z)) e^(−z)`; other orders use the integral representation `K_ν(z) = ∫₀^∞ e^(−z cosh t) cosh(ν t) dt`.
+
+The oracle runs at the end of every numerical Editor pass and emits four optional diagnostics on `NumericalArtifactPayload.diagnostics`:
+
+| Field | Source | Verifier check |
+|---|---|---|
+| `warburg_nu` | `1 − d/2` for the Editor's `s = 1` convention | — (informational) |
+| `closed_form_residual` | `‖F_numerical − F̃_oracle‖₂ / ‖F̃_oracle‖₂` over non-zero modes | CHK08 |
+| `kernel_cutoff_value` | `K(T_now − δ)` (zero by construction in the latency model) | — (informational) |
+| `mercer_slope` | log-log slope of eigenvalues of (I^{1/2})(I^{1/2})ᵀ on a 60-pt grid | CHK12 |
+
+A typical pass yields `closed_form_residual ≈ 1e−10` (Bessel quadrature precision) when the numerical integrator is healthy; values above `policy.warburg_residual_tol` (default 0.05) flag systematic drift between the numerical pipeline and the analytic theorem and trigger CHK08. `policy` exposes two new tunables (`warburg_residual_tol`, `mercer_slope_tol`) with conservative defaults; `warburg_kernel_cutoff_tol` remains in the schema for forward compatibility but is currently unused.
+
+For non-gaussian kernels, `computeWarburgOracle` returns nulls and the Warburg checks silently skip — preserving the existing pipeline unchanged.
 
 ---
 

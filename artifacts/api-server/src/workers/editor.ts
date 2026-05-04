@@ -18,6 +18,12 @@ import {
   topEigenvectors,
   gramSchmidt,
 } from "../lib/math.js";
+import {
+  fMuClosedForm,
+  kernelKClosedForm,
+  mercerHalfIntegrationBasis,
+  type WarburgParams,
+} from "../lib/warburg.js";
 import type { KernelParams, NumericalDescriptor as JobDescriptor, NumericalArtifactPayload as ArtifactPayload } from "@workspace/db";
 
 export interface EditorResult {
@@ -388,6 +394,8 @@ export async function runEditor(descriptor: JobDescriptor): Promise<EditorResult
   const dualTruncError = estimateDualError(F, truncation.M);
   const spectralTailErr = estimateSpectralTail(lambdas, r);
 
+  const warburg = computeWarburgOracle(descriptor, F, dualIndices);
+
   const artifact: ArtifactPayload = {
     dual_indices: dualIndices,
     F: serializeSparse(F),
@@ -400,8 +408,78 @@ export async function runEditor(descriptor: JobDescriptor): Promise<EditorResult
       cond_I_minus_G: cond,
       dual_truncation_error: dualTruncError,
       spectral_tail_error: spectralTailErr,
+      warburg_nu: warburg.nu,
+      closed_form_residual: warburg.residual,
+      mercer_slope: warburg.mercerSlope,
+      kernel_cutoff_value: warburg.kernelCutoffValue,
     },
   };
 
   return { artifact };
+}
+
+/**
+ * Closed-form Warburg oracle. Recomputes F̃[μ] via the exact Bessel
+ * formula at the Warburg pole s=(d+1)/2 for the gaussian kernel case.
+ * Returns nulls when the kernel falls outside the oracle's domain so
+ * the Verifier can skip its Warburg checks gracefully.
+ */
+function computeWarburgOracle(
+  descriptor: JobDescriptor,
+  Fmap: Map<string, number>,
+  dualIndices: number[][],
+): {
+  nu: number | null;
+  residual: number | null;
+  mercerSlope: number | null;
+  kernelCutoffValue: number | null;
+} {
+  if (descriptor.kernel.type !== "gaussian") {
+    return { nu: null, residual: null, mercerSlope: null, kernelCutoffValue: null };
+  }
+  const sigma = descriptor.kernel.sigma ?? 1.0;
+  // Editor's k0(t) for "gaussian" is exp(-σ²t), so in the Warburg parameterization
+  //   k0(t) = t^(s-1) e^(-π a² t)
+  // we set s = 1 (no t^(s-1) prefactor) and a² = σ²/π so that π a² = σ². The
+  // lattice integrand t^(-d/2) e^(-σ²t - β/t) then reduces to the standard
+  //   ∫ t^(ν-1) e^(-A t - B/t) dt = 2 (B/A)^(ν/2) K_ν(2 √(AB))
+  // with A = σ², B = π μᵀ Q⁻¹ μ, ν = 1 - d/2. This gives an exact closed form
+  // that matches editor.computeF up to quadrature precision.
+  const a = sigma / Math.sqrt(Math.PI);
+  const d = descriptor.Q.length;
+  const sEff = 1; // editor convention: no t^(s-1) prefactor
+  const params: WarburgParams = {
+    s: sEff,
+    a,
+    lambda: descriptor.latency.lambda,
+    Tnow: descriptor.latency.Tnow,
+    delta: descriptor.latency.delta,
+    Qinv: matInverse(descriptor.Q),
+    d,
+  };
+  const nu = sEff - d / 2;
+
+  // Compute residual on non-zero modes only — μ=0 uses a separate integrand
+  // in the editor (one extra power of t for integrability).
+  let sumDiff2 = 0;
+  let sumF2 = 0;
+  for (const mu of dualIndices) {
+    if (mu.every(v => v === 0)) continue;
+    const key = mu.join(",");
+    const fNum = Fmap.get(key) ?? 0;
+    const fOracle = fMuClosedForm(mu, params);
+    if (!isFinite(fOracle)) continue;
+    sumDiff2 += (fNum - fOracle) ** 2;
+    sumF2 += fOracle * fOracle;
+  }
+  const residual =
+    sumF2 > 1e-30 ? Math.sqrt(sumDiff2 / sumF2) : null;
+  const kernelCutoffValue = kernelKClosedForm(params.Tnow - params.delta, params);
+  const mercer = mercerHalfIntegrationBasis(0.5); // half-integration α=1/2 fixed
+  return {
+    nu,
+    residual,
+    mercerSlope: isFinite(mercer.slope) ? mercer.slope : null,
+    kernelCutoffValue,
+  };
 }

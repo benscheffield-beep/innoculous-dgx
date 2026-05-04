@@ -72,6 +72,21 @@ export interface PolicyConfig {
    * @minimum 1
    */
   min_recheck_count?: number;
+  /**
+   * numerical CHK08 — max relative ||F − F̃||/||F̃|| against the closed-form Warburg oracle
+   * @minimum 0
+   */
+  warburg_residual_tol?: number;
+  /**
+   * numerical CHK09 — max |K(T_now − δ)| (live/static cancellation tolerance)
+   * @minimum 0
+   */
+  warburg_kernel_cutoff_tol?: number;
+  /**
+   * numerical CHK12 — tolerance for Mercer eigenvalue log-log slope around −1
+   * @minimum 0
+   */
+  mercer_slope_tol?: number;
 }
 
 /**

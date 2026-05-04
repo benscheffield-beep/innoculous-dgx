@@ -28,6 +28,9 @@ const policyConfigSchema = z.object({
   judge_disagreement_max: z.number().min(0).max(1).optional(),
   min_probes_per_month: z.number().int().positive().optional(),
   min_recheck_count: z.number().int().positive().optional(),
+  warburg_residual_tol: z.number().positive().optional(),
+  warburg_kernel_cutoff_tol: z.number().positive().optional(),
+  mercer_slope_tol: z.number().positive().optional(),
 });
 
 const numericalDescriptorSchema = z.object({

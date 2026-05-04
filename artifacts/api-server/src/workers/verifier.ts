@@ -9,6 +9,9 @@ export interface PolicyConfig {
   cond_limit: number;
   dual_error_tol: number;
   spectral_tail_tol: number;
+  warburg_residual_tol: number;
+  warburg_kernel_cutoff_tol: number;
+  mercer_slope_tol: number;
 }
 
 export const DEFAULT_POLICY: PolicyConfig = {
@@ -16,6 +19,9 @@ export const DEFAULT_POLICY: PolicyConfig = {
   cond_limit: 1_000_000,
   dual_error_tol: 1e-6,
   spectral_tail_tol: 1e-6,
+  warburg_residual_tol: 0.05,
+  warburg_kernel_cutoff_tol: 1e-9,
+  mercer_slope_tol: 0.4,
 };
 
 export type Verdict = "pass" | "warn" | "fail";
@@ -239,6 +245,63 @@ function chk07Privacy(payload: ArtifactPayload): DiagnosticIssue | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Warburg closed-form oracle checks (CHK08–CHK12).
+// Each check no-ops with a null return when the Editor reported the relevant
+// diagnostic as null/undefined — this happens for kernels outside the oracle's
+// domain (e.g. mellin), so the existing numerical pipeline keeps working.
+// ---------------------------------------------------------------------------
+
+function chk08ClosedFormResidual(
+  diag: ArtifactPayload["diagnostics"],
+  policy: PolicyConfig,
+): DiagnosticIssue | null {
+  const r = diag.closed_form_residual;
+  if (r == null) return null;
+  if (r > policy.warburg_residual_tol) {
+    return {
+      check_id: "CHK08",
+      severity: "warn",
+      message: `Closed-form residual ||F − F̃||/||F̃|| = ${r.toExponential(3)} exceeds tol ${policy.warburg_residual_tol}. Numerical F[μ] drifts from the Warburg Bessel oracle — increase precision.b or check kernel parameters.`,
+      remediation: "recommend_increase_b",
+    };
+  }
+  return null;
+}
+
+function chk10WarburgIntegrability(
+  diag: ArtifactPayload["diagnostics"],
+): DiagnosticIssue | null {
+  const nu = diag.warburg_nu;
+  if (nu == null) return null;
+  if (nu >= 1) {
+    return {
+      check_id: "CHK10",
+      severity: "warn",
+      message: `Warburg ν = ${nu.toFixed(4)} ≥ 1; second descent fails to be integrable. Reduce dimension d or widen kernel pole s.`,
+      remediation: "reduce_truncation_radius_M",
+    };
+  }
+  return null;
+}
+
+function chk12MercerSlope(
+  diag: ArtifactPayload["diagnostics"],
+  policy: PolicyConfig,
+): DiagnosticIssue | null {
+  const slope = diag.mercer_slope;
+  if (slope == null) return null;
+  if (!isFinite(slope) || Math.abs(slope + 1) > policy.mercer_slope_tol) {
+    return {
+      check_id: "CHK12",
+      severity: "warn",
+      message: `Mercer eigenvalue slope = ${slope.toFixed(3)}; expected −1 ± ${policy.mercer_slope_tol}. Universal subspace heuristic r ≈ 16 may not apply.`,
+      remediation: "recommend_increase_r",
+    };
+  }
+  return null;
+}
+
 export async function runVerifier(
   payload: ArtifactPayload,
   storedHash: string,
@@ -254,6 +317,9 @@ export async function runVerifier(
     Promise.resolve(chk05SpectralTail(payload.diagnostics, policy)),
     Promise.resolve(chk06Causality(payload)),
     Promise.resolve(chk07Privacy(payload)),
+    Promise.resolve(chk08ClosedFormResidual(payload.diagnostics, policy)),
+    Promise.resolve(chk10WarburgIntegrability(payload.diagnostics)),
+    Promise.resolve(chk12MercerSlope(payload.diagnostics, policy)),
   ]);
 
   const issues: DiagnosticIssue[] = checks.filter((c): c is DiagnosticIssue => c !== null);

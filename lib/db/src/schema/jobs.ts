@@ -27,6 +27,10 @@ export interface PolicyConfig {
   judge_disagreement_max?: number;
   min_probes_per_month?: number;
   min_recheck_count?: number;
+  // Warburg closed-form oracle thresholds (numerical pipeline)
+  warburg_residual_tol?: number;
+  warburg_kernel_cutoff_tol?: number;
+  mercer_slope_tol?: number;
 }
 
 export interface NumericalDescriptor {
