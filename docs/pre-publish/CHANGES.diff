@@ -1,0 +1,687 @@
+diff --git a/artifacts/api-server/src/lib/warburg.ts b/artifacts/api-server/src/lib/warburg.ts
+new file mode 100644
+index 0000000..5392441
+--- /dev/null
++++ b/artifacts/api-server/src/lib/warburg.ts
+@@ -0,0 +1,376 @@
++/**
++ * warburg.ts
++ * ==========
++ *
++ * Closed-form reference oracle for the unified Warburg theorem (TS port of
++ * warburg_unified.py). Used by the numerical Editor to produce a closed-form
++ * F̃[μ] alongside its numerical F[μ], and by the Verifier to enforce five
++ * theorem-level predictions (CHK08–CHK12) against the stored artifact.
++ *
++ * The oracle assumes the Warburg pole s = (d+1)/2, so the Bessel order is
++ * always ν = s − d/2 = 1/2. This collapses the lattice integral to a closed
++ * form involving K_{1/2}(z) = √(π/(2z)) e^(−z), which is exact and cheap.
++ *
++ * For ν ≠ 1/2 (used only by future generalizations) we fall back to a
++ * numerical evaluation of K_ν via the integral representation
++ *   K_ν(z) = ∫₀^∞ e^(−z cosh t) cosh(ν t) dt.
++ */
++
++import type { Matrix, Vec } from "./math.js";
++import { dot, norm2, scalarVec, vecSub } from "./math.js";
++
++// ---------------------------------------------------------------------------
++// Γ via Lanczos (matches editor.ts:lgamma; lifted here for shared use).
++// ---------------------------------------------------------------------------
++
++const LANCZOS_C = [
++  76.18009172947146, -86.50532032941677, 24.01409824083091,
++  -1.231739572450155, 0.001208650973866179, -0.000005395239384953,
++];
++
++export function lgamma(x: number): number {
++  if (x <= 0) return Number.NaN;
++  let y = x;
++  let tmp = x + 5.5;
++  tmp -= (x + 0.5) * Math.log(tmp);
++  let ser = 1.000000000190015;
++  for (const ci of LANCZOS_C) {
++    y += 1;
++    ser += ci / y;
++  }
++  return -tmp + Math.log((2.5066282746310005 * ser) / x);
++}
++
++export function gammaFunc(x: number): number {
++  return Math.exp(lgamma(x));
++}
++
++// ---------------------------------------------------------------------------
++// Modified Bessel function of the second kind K_ν(z), z > 0.
++// Exact closed form for ν = 1/2; numerical integration of the standard
++// integral representation otherwise.
++// ---------------------------------------------------------------------------
++
++export function besselK(nu: number, z: number): number {
++  if (!isFinite(z) || z <= 0) return Number.POSITIVE_INFINITY;
++  if (Math.abs(nu - 0.5) < 1e-12) {
++    return Math.sqrt(Math.PI / (2 * z)) * Math.exp(-z);
++  }
++  if (Math.abs(nu + 0.5) < 1e-12) {
++    return Math.sqrt(Math.PI / (2 * z)) * Math.exp(-z);
++  }
++  // Generic ν: K_ν(z) = ∫₀^∞ e^(−z cosh t) cosh(νt) dt.
++  // Substitute u = sinh(t) so du = cosh(t) dt ; integrand decays super-fast.
++  // 64-point Gauss–Legendre on [0, T] with T chosen so e^(−z cosh T) ≈ 1e−18.
++  const Tmax = Math.max(8, Math.acosh(1 + 40 / Math.max(z, 1e-12)));
++  const N = 80;
++  const h = Tmax / N;
++  let acc = 0;
++  for (let i = 0; i < N; i++) {
++    const t = (i + 0.5) * h;
++    acc += Math.exp(-z * Math.cosh(t)) * Math.cosh(nu * t);
++  }
++  return acc * h;
++}
++
++// ---------------------------------------------------------------------------
++// Closed-form lattice integral
++//   ∫₀^∞ t^(ν−1) exp(−A t − B/t) dt = 2 (B/A)^(ν/2) K_ν(2 √(AB))
++// with the B → 0 limit Γ(ν)/A^ν.
++// ---------------------------------------------------------------------------
++
++export function besselIntegralClosedForm(A: number, B: number, nu: number): number {
++  if (!isFinite(A) || A <= 0) return Number.NaN;
++  if (B <= 1e-15) {
++    // B → 0 limit: Γ(ν)/A^ν, finite only for ν > 0. For ν ≤ 0 the integral
++    // diverges and the caller (e.g. the editor's zero-mode branch) must use
++    // a different integrand; we return NaN so the divergence is explicit.
++    if (nu <= 0) return Number.NaN;
++    return gammaFunc(nu) / Math.pow(A, nu);
++  }
++  const z = 2 * Math.sqrt(A * B);
++  return 2 * Math.pow(B / A, nu / 2) * besselK(nu, z);
++}
++
++// ---------------------------------------------------------------------------
++// Closed-form F̃[μ] for the Warburg-pole Mellin kernel
++//   k₀(t) = t^(s−1) e^(−π a² t),  K(t) = k₀(t) (1 − e^(−λ(t−T+δ))).
++// Static channel uses A = π a²; live channel uses A + λ with the
++// e^(λ(T−δ)) prefactor.
++// ---------------------------------------------------------------------------
++
++export interface WarburgParams {
++  s: number; // Warburg pole, default (d+1)/2
++  a: number; // Gauss regulator
++  lambda: number;
++  Tnow: number;
++  delta: number;
++  Qinv: Matrix;
++  d: number;
++}
++
++export function fMuClosedForm(mu: Vec, p: WarburgParams): number {
++  const nu = p.s - p.d / 2;
++  const A = Math.PI * p.a * p.a;
++  let B = 0;
++  for (let i = 0; i < p.d; i++) {
++    for (let j = 0; j < p.d; j++) {
++      B += mu[i]! * p.Qinv[i]![j]! * mu[j]!;
++    }
++  }
++  B *= Math.PI;
++  const stat = besselIntegralClosedForm(A, B, nu);
++  const live =
++    Math.exp(p.lambda * (p.Tnow - p.delta)) *
++    besselIntegralClosedForm(A + p.lambda, B, nu);
++  return stat - live;
++}
++
++// ---------------------------------------------------------------------------
++// Closed-form kernel K(t) — used by phase 2 validator (must vanish at t=T−δ).
++// ---------------------------------------------------------------------------
++
++export function kernelKClosedForm(t: number, p: WarburgParams): number {
++  if (t <= 0) return 0;
++  const k0 = Math.pow(t, p.s - 1) * Math.exp(-Math.PI * p.a * p.a * t);
++  return k0 * (1 - Math.exp(-p.lambda * (t - p.Tnow + p.delta)));
++}
++
++// ---------------------------------------------------------------------------
++// Mercer basis for the half-integration operator I^α on L²(0, T_max).
++//
++//   (I^α f)(t) = (1/Γ(α)) ∫₀^t (t−s)^(α−1) f(s) ds
++//
++// Eigenvalues of (I^α)(I^α)^T scale as k^(−2α) = k^(−1) at α = 1/2.
++// We use Jacobi eigendecomposition for the small symmetric matrix (≤ 80×80)
++// so we get ALL eigenvalues at once — needed for the slope fit on the bulk
++// tail (modes 3 … 60).
++// ---------------------------------------------------------------------------
++
++function jacobiEigen(Ain: Matrix): { values: Vec; vectors: Matrix } {
++  const n = Ain.length;
++  const A: Matrix = Ain.map(row => [...row]);
++  const V: Matrix = Array.from({ length: n }, (_, i) =>
++    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)),
++  );
++  const maxSweeps = 80;
++  for (let sweep = 0; sweep < maxSweeps; sweep++) {
++    let off = 0;
++    for (let i = 0; i < n; i++)
++      for (let j = i + 1; j < n; j++) off += A[i]![j]! * A[i]![j]!;
++    if (off < 1e-22) break;
++    for (let p = 0; p < n - 1; p++) {
++      for (let q = p + 1; q < n; q++) {
++        const apq = A[p]![q]!;
++        if (Math.abs(apq) < 1e-14) continue;
++        const app = A[p]![p]!;
++        const aqq = A[q]![q]!;
++        const theta = (aqq - app) / (2 * apq);
++        const t =
++          theta >= 0
++            ? 1 / (theta + Math.sqrt(1 + theta * theta))
++            : 1 / (theta - Math.sqrt(1 + theta * theta));
++        const c = 1 / Math.sqrt(1 + t * t);
++        const s = t * c;
++        A[p]![p] = app - t * apq;
++        A[q]![q] = aqq + t * apq;
++        A[p]![q] = 0;
++        A[q]![p] = 0;
++        for (let i = 0; i < n; i++) {
++          if (i !== p && i !== q) {
++            const aip = A[i]![p]!;
++            const aiq = A[i]![q]!;
++            A[i]![p] = c * aip - s * aiq;
++            A[p]![i] = A[i]![p]!;
++            A[i]![q] = s * aip + c * aiq;
++            A[q]![i] = A[i]![q]!;
++          }
++          const vip = V[i]![p]!;
++          const viq = V[i]![q]!;
++          V[i]![p] = c * vip - s * viq;
++          V[i]![q] = s * vip + c * viq;
++        }
++      }
++    }
++  }
++  const values: Vec = A.map((_, i) => A[i]![i]!);
++  // sort descending
++  const idx = values.map((_, i) => i).sort((a, b) => values[b]! - values[a]!);
++  const sortedVals: Vec = idx.map(i => values[i]!);
++  const sortedVecs: Matrix = Array.from({ length: n }, (_, i) =>
++    idx.map(j => V[i]![j]!),
++  );
++  return { values: sortedVals, vectors: sortedVecs };
++}
++
++export interface MercerResult {
++  eigenvalues: Vec; // descending
++  vectors: Matrix; // columns are eigenvectors
++  tGrid: Vec;
++  slope: number; // log–log slope on modes [3, 50]
++}
++
++export function mercerHalfIntegrationBasis(
++  alpha: number = 0.5,
++  nGrid: number = 60,
++  tMax: number = 10,
++): MercerResult {
++  const dt = tMax / nGrid;
++  const tGrid: Vec = Array.from({ length: nGrid }, (_, i) => (i + 1) * dt);
++  // Discretize I^α: I_op[i][j] = ((t_i − t_j)^(α−1) dt / Γ(α)) for j < i, else 0.
++  const gAlpha = gammaFunc(alpha);
++  const Iop: Matrix = Array.from({ length: nGrid }, () =>
++    new Array(nGrid).fill(0) as Vec,
++  );
++  for (let i = 0; i < nGrid; i++) {
++    for (let j = 0; j < i; j++) {
++      const diff = tGrid[i]! - tGrid[j]!;
++      Iop[i]![j] = (Math.pow(diff, alpha - 1) * dt) / gAlpha;
++    }
++  }
++  // K_sym = I_op · I_op^T (symmetric PSD).
++  const K: Matrix = Array.from({ length: nGrid }, () =>
++    new Array(nGrid).fill(0) as Vec,
++  );
++  for (let i = 0; i < nGrid; i++) {
++    for (let j = i; j < nGrid; j++) {
++      let acc = 0;
++      for (let k = 0; k < nGrid; k++) acc += Iop[i]![k]! * Iop[j]![k]!;
++      K[i]![j] = acc;
++      K[j]![i] = acc;
++    }
++  }
++  const { values, vectors } = jacobiEigen(K);
++  const positive = values.filter(v => v > 1e-14);
++  const slope = logLogSlope(positive, 3, Math.min(50, positive.length));
++  return { eigenvalues: values, vectors, tGrid, slope };
++}
++
++function logLogSlope(vals: Vec, lo: number, hi: number): number {
++  if (hi - lo < 3) return Number.NaN;
++  const xs: Vec = [];
++  const ys: Vec = [];
++  for (let k = lo; k < hi; k++) {
++    if (vals[k]! > 0) {
++      xs.push(Math.log(k + 1));
++      ys.push(Math.log(vals[k]!));
++    }
++  }
++  if (xs.length < 3) return Number.NaN;
++  const n = xs.length;
++  const xm = xs.reduce((s, v) => s + v, 0) / n;
++  const ym = ys.reduce((s, v) => s + v, 0) / n;
++  let num = 0,
++    den = 0;
++  for (let i = 0; i < n; i++) {
++    num += (xs[i]! - xm) * (ys[i]! - ym);
++    den += (xs[i]! - xm) ** 2;
++  }
++  return den < 1e-20 ? Number.NaN : num / den;
++}
++
++// ---------------------------------------------------------------------------
++// Five theorem-level validators. Each returns a structured result that the
++// Verifier maps to a DiagnosticIssue.
++// ---------------------------------------------------------------------------
++
++export interface PhaseResult {
++  phase: 1 | 2 | 3 | 4 | 5;
++  pass: boolean;
++  measured?: number;
++  expected?: number;
++  message: string;
++}
++
++/** Phase 1 — log-log slope of L(C) = (Cc/C)^α equals −α. */
++export function validatePhase1(alphaC: number, Cc: number): PhaseResult {
++  const Cs: Vec = [];
++  const Ls: Vec = [];
++  for (let i = 0; i < 30; i++) {
++    const c = Math.exp(Math.log(1e15) + (i / 29) * (Math.log(1e20) - Math.log(1e15)));
++    Cs.push(Math.log(c));
++    Ls.push(Math.log(Math.pow(Cc / c, alphaC)));
++  }
++  const n = Cs.length;
++  const xm = Cs.reduce((s, v) => s + v, 0) / n;
++  const ym = Ls.reduce((s, v) => s + v, 0) / n;
++  let num = 0,
++    den = 0;
++  for (let i = 0; i < n; i++) {
++    num += (Cs[i]! - xm) * (Ls[i]! - ym);
++    den += (Cs[i]! - xm) ** 2;
++  }
++  const slope = num / den;
++  return {
++    phase: 1,
++    expected: -alphaC,
++    measured: slope,
++    pass: Math.abs(slope + alphaC) < 1e-6,
++    message: `phase1 envelope slope = ${slope.toFixed(6)} (expected ${(-alphaC).toFixed(6)})`,
++  };
++}
++
++/** Phase 2 — live channel cancels static at t = T_now − δ, so K(t_cut) = 0. */
++export function validatePhase2(p: WarburgParams, tol: number = 1e-9): PhaseResult {
++  const tCut = p.Tnow - p.delta + 1e-12;
++  const v = kernelKClosedForm(tCut, p);
++  return {
++    phase: 2,
++    measured: v,
++    expected: 0,
++    pass: Math.abs(v) < tol,
++    message: `phase2 K(T−δ) = ${v.toExponential(3)} (expected ≈ 0)`,
++  };
++}
++
++/** Phase 3 — second-descent integrability requires ν < 1. */
++export function validatePhase3(nu: number): PhaseResult {
++  return {
++    phase: 3,
++    measured: nu,
++    expected: 0.5,
++    pass: nu < 1,
++    message: `phase3 ν = ${nu.toFixed(6)} (integrable iff ν < 1)`,
++  };
++}
++
++/** Phase 4 — at the Warburg pole ν = 1/2 exactly. */
++export function validatePhase4(nu: number, tol: number = 1e-9): PhaseResult {
++  return {
++    phase: 4,
++    measured: nu,
++    expected: 0.5,
++    pass: Math.abs(nu - 0.5) < tol,
++    message: `phase4 ν = ${nu.toFixed(6)} (expected 0.5 at Warburg pole)`,
++  };
++}
++
++/** Phase 5 — Mercer eigenvalues scale as k^(−1); fit slope ∈ [−1.4, −0.6]. */
++export function validatePhase5(slope: number, tol: number = 0.4): PhaseResult {
++  return {
++    phase: 5,
++    measured: slope,
++    expected: -1,
++    pass: isFinite(slope) && Math.abs(slope + 1) < tol,
++    message: `phase5 mercer slope = ${slope.toFixed(3)} (expected −1 ± ${tol})`,
++  };
++}
++
++// ---------------------------------------------------------------------------
++// Stable signature hash for a Warburg parameter bundle (matches
++// Job.signature() in the Python reference at field-level granularity).
++// ---------------------------------------------------------------------------
++
++export function warburgSignature(p: WarburgParams): string {
++  const sig = `s=${p.s}|d=${p.d}|a=${p.a}|lam=${p.lambda}|T=${p.Tnow}|delta=${p.delta}`;
++  let h = 2166136261;
++  for (let i = 0; i < sig.length; i++) {
++    h ^= sig.charCodeAt(i);
++    h = Math.imul(h, 16777619);
++  }
++  return (h >>> 0).toString(16).padStart(8, "0");
++}
++
++// Re-export for callers that want to compute residuals without pulling in
++// editor's helpers.
++export { dot, norm2, scalarVec, vecSub };
+diff --git a/artifacts/api-server/src/routes/jobs.ts b/artifacts/api-server/src/routes/jobs.ts
+index 26b0f2b..ef83024 100644
+--- a/artifacts/api-server/src/routes/jobs.ts
++++ b/artifacts/api-server/src/routes/jobs.ts
+@@ -1,7 +1,14 @@
+ import { Router } from "express";
+ import { eq, count, sql } from "drizzle-orm";
+ import { z } from "zod";
+-import { db, jobsTable, jobArtifactsTable, jobDiagnosticsTable } from "@workspace/db";
++import {
++  db,
++  jobsTable,
++  jobArtifactsTable,
++  jobDiagnosticsTable,
++  type JobDescriptor,
++  type PolicyConfig,
++} from "@workspace/db";
+ import { runPipeline, retryPipeline } from "../workers/pipeline.js";
+ import { logger } from "../lib/logger.js";
+ 
+@@ -21,6 +28,9 @@ const policyConfigSchema = z.object({
+   judge_disagreement_max: z.number().min(0).max(1).optional(),
+   min_probes_per_month: z.number().int().positive().optional(),
+   min_recheck_count: z.number().int().positive().optional(),
++  warburg_residual_tol: z.number().positive().optional(),
++  warburg_kernel_cutoff_tol: z.number().positive().optional(),
++  mercer_slope_tol: z.number().positive().optional(),
+ });
+ 
+ const numericalDescriptorSchema = z.object({
+@@ -133,11 +143,11 @@ router.post("/jobs", async (req, res) => {
+   };
+   const descriptor = isCutoff ? { ...rest, kind: "cutoff_trace" } : { kind: "numerical", ...rest };
+ 
+-  const insertValues = {
++  const insertValues: typeof jobsTable.$inferInsert = {
+     kind: isCutoff ? "cutoff_trace" : "numerical",
+     status: "queued",
+-    kernelParams: descriptor as never,
+-    policyConfig: (policy_config ?? {}) as never,
++    kernelParams: descriptor as JobDescriptor,
++    policyConfig: (policy_config ?? {}) as PolicyConfig,
+     ...(jobId ? { id: jobId } : {}),
+   };
+ 
+diff --git a/artifacts/api-server/src/workers/editor.ts b/artifacts/api-server/src/workers/editor.ts
+index 503f36e..3fe5d03 100644
+--- a/artifacts/api-server/src/workers/editor.ts
++++ b/artifacts/api-server/src/workers/editor.ts
+@@ -18,6 +18,12 @@ import {
+   topEigenvectors,
+   gramSchmidt,
+ } from "../lib/math.js";
++import {
++  fMuClosedForm,
++  kernelKClosedForm,
++  mercerHalfIntegrationBasis,
++  type WarburgParams,
++} from "../lib/warburg.js";
+ import type { KernelParams, NumericalDescriptor as JobDescriptor, NumericalArtifactPayload as ArtifactPayload } from "@workspace/db";
+ 
+ export interface EditorResult {
+@@ -388,6 +394,8 @@ export async function runEditor(descriptor: JobDescriptor): Promise<EditorResult
+   const dualTruncError = estimateDualError(F, truncation.M);
+   const spectralTailErr = estimateSpectralTail(lambdas, r);
+ 
++  const warburg = computeWarburgOracle(descriptor, F, dualIndices);
++
+   const artifact: ArtifactPayload = {
+     dual_indices: dualIndices,
+     F: serializeSparse(F),
+@@ -400,8 +408,78 @@ export async function runEditor(descriptor: JobDescriptor): Promise<EditorResult
+       cond_I_minus_G: cond,
+       dual_truncation_error: dualTruncError,
+       spectral_tail_error: spectralTailErr,
++      warburg_nu: warburg.nu,
++      closed_form_residual: warburg.residual,
++      mercer_slope: warburg.mercerSlope,
++      kernel_cutoff_value: warburg.kernelCutoffValue,
+     },
+   };
+ 
+   return { artifact };
+ }
++
++/**
++ * Closed-form Warburg oracle. Recomputes F̃[μ] via the exact Bessel
++ * formula at the Warburg pole s=(d+1)/2 for the gaussian kernel case.
++ * Returns nulls when the kernel falls outside the oracle's domain so
++ * the Verifier can skip its Warburg checks gracefully.
++ */
++function computeWarburgOracle(
++  descriptor: JobDescriptor,
++  Fmap: Map<string, number>,
++  dualIndices: number[][],
++): {
++  nu: number | null;
++  residual: number | null;
++  mercerSlope: number | null;
++  kernelCutoffValue: number | null;
++} {
++  if (descriptor.kernel.type !== "gaussian") {
++    return { nu: null, residual: null, mercerSlope: null, kernelCutoffValue: null };
++  }
++  const sigma = descriptor.kernel.sigma ?? 1.0;
++  // Editor's k0(t) for "gaussian" is exp(-σ²t), so in the Warburg parameterization
++  //   k0(t) = t^(s-1) e^(-π a² t)
++  // we set s = 1 (no t^(s-1) prefactor) and a² = σ²/π so that π a² = σ². The
++  // lattice integrand t^(-d/2) e^(-σ²t - β/t) then reduces to the standard
++  //   ∫ t^(ν-1) e^(-A t - B/t) dt = 2 (B/A)^(ν/2) K_ν(2 √(AB))
++  // with A = σ², B = π μᵀ Q⁻¹ μ, ν = 1 - d/2. This gives an exact closed form
++  // that matches editor.computeF up to quadrature precision.
++  const a = sigma / Math.sqrt(Math.PI);
++  const d = descriptor.Q.length;
++  const sEff = 1; // editor convention: no t^(s-1) prefactor
++  const params: WarburgParams = {
++    s: sEff,
++    a,
++    lambda: descriptor.latency.lambda,
++    Tnow: descriptor.latency.Tnow,
++    delta: descriptor.latency.delta,
++    Qinv: matInverse(descriptor.Q),
++    d,
++  };
++  const nu = sEff - d / 2;
++
++  // Compute residual on non-zero modes only — μ=0 uses a separate integrand
++  // in the editor (one extra power of t for integrability).
++  let sumDiff2 = 0;
++  let sumF2 = 0;
++  for (const mu of dualIndices) {
++    if (mu.every(v => v === 0)) continue;
++    const key = mu.join(",");
++    const fNum = Fmap.get(key) ?? 0;
++    const fOracle = fMuClosedForm(mu, params);
++    if (!isFinite(fOracle)) continue;
++    sumDiff2 += (fNum - fOracle) ** 2;
++    sumF2 += fOracle * fOracle;
++  }
++  const residual =
++    sumF2 > 1e-30 ? Math.sqrt(sumDiff2 / sumF2) : null;
++  const kernelCutoffValue = kernelKClosedForm(params.Tnow - params.delta, params);
++  const mercer = mercerHalfIntegrationBasis(0.5); // half-integration α=1/2 fixed
++  return {
++    nu,
++    residual,
++    mercerSlope: isFinite(mercer.slope) ? mercer.slope : null,
++    kernelCutoffValue,
++  };
++}
+diff --git a/artifacts/api-server/src/workers/verifier.ts b/artifacts/api-server/src/workers/verifier.ts
+index 7733b61..eb0bde2 100644
+--- a/artifacts/api-server/src/workers/verifier.ts
++++ b/artifacts/api-server/src/workers/verifier.ts
+@@ -9,6 +9,9 @@ export interface PolicyConfig {
+   cond_limit: number;
+   dual_error_tol: number;
+   spectral_tail_tol: number;
++  warburg_residual_tol: number;
++  warburg_kernel_cutoff_tol: number;
++  mercer_slope_tol: number;
+ }
+ 
+ export const DEFAULT_POLICY: PolicyConfig = {
+@@ -16,6 +19,9 @@ export const DEFAULT_POLICY: PolicyConfig = {
+   cond_limit: 1_000_000,
+   dual_error_tol: 1e-6,
+   spectral_tail_tol: 1e-6,
++  warburg_residual_tol: 0.05,
++  warburg_kernel_cutoff_tol: 1e-9,
++  mercer_slope_tol: 0.4,
+ };
+ 
+ export type Verdict = "pass" | "warn" | "fail";
+@@ -239,6 +245,63 @@ function chk07Privacy(payload: ArtifactPayload): DiagnosticIssue | null {
+   return null;
+ }
+ 
++// ---------------------------------------------------------------------------
++// Warburg closed-form oracle checks (CHK08–CHK12).
++// Each check no-ops with a null return when the Editor reported the relevant
++// diagnostic as null/undefined — this happens for kernels outside the oracle's
++// domain (e.g. mellin), so the existing numerical pipeline keeps working.
++// ---------------------------------------------------------------------------
++
++function chk08ClosedFormResidual(
++  diag: ArtifactPayload["diagnostics"],
++  policy: PolicyConfig,
++): DiagnosticIssue | null {
++  const r = diag.closed_form_residual;
++  if (r == null) return null;
++  if (r > policy.warburg_residual_tol) {
++    return {
++      check_id: "CHK08",
++      severity: "warn",
++      message: `Closed-form residual ||F − F̃||/||F̃|| = ${r.toExponential(3)} exceeds tol ${policy.warburg_residual_tol}. Numerical F[μ] drifts from the Warburg Bessel oracle — increase precision.b or check kernel parameters.`,
++      remediation: "recommend_increase_b",
++    };
++  }
++  return null;
++}
++
++function chk10WarburgIntegrability(
++  diag: ArtifactPayload["diagnostics"],
++): DiagnosticIssue | null {
++  const nu = diag.warburg_nu;
++  if (nu == null) return null;
++  if (nu >= 1) {
++    return {
++      check_id: "CHK10",
++      severity: "warn",
++      message: `Warburg ν = ${nu.toFixed(4)} ≥ 1; second descent fails to be integrable. Reduce dimension d or widen kernel pole s.`,
++      remediation: "reduce_truncation_radius_M",
++    };
++  }
++  return null;
++}
++
++function chk12MercerSlope(
++  diag: ArtifactPayload["diagnostics"],
++  policy: PolicyConfig,
++): DiagnosticIssue | null {
++  const slope = diag.mercer_slope;
++  if (slope == null) return null;
++  if (!isFinite(slope) || Math.abs(slope + 1) > policy.mercer_slope_tol) {
++    return {
++      check_id: "CHK12",
++      severity: "warn",
++      message: `Mercer eigenvalue slope = ${slope.toFixed(3)}; expected −1 ± ${policy.mercer_slope_tol}. Universal subspace heuristic r ≈ 16 may not apply.`,
++      remediation: "recommend_increase_r",
++    };
++  }
++  return null;
++}
++
+ export async function runVerifier(
+   payload: ArtifactPayload,
+   storedHash: string,
+@@ -254,6 +317,9 @@ export async function runVerifier(
+     Promise.resolve(chk05SpectralTail(payload.diagnostics, policy)),
+     Promise.resolve(chk06Causality(payload)),
+     Promise.resolve(chk07Privacy(payload)),
++    Promise.resolve(chk08ClosedFormResidual(payload.diagnostics, policy)),
++    Promise.resolve(chk10WarburgIntegrability(payload.diagnostics)),
++    Promise.resolve(chk12MercerSlope(payload.diagnostics, policy)),
+   ]);
+ 
+   const issues: DiagnosticIssue[] = checks.filter((c): c is DiagnosticIssue => c !== null);
+diff --git a/lib/api-spec/openapi.yaml b/lib/api-spec/openapi.yaml
+index 2158d9b..763b311 100644
+--- a/lib/api-spec/openapi.yaml
++++ b/lib/api-spec/openapi.yaml
+@@ -365,6 +365,21 @@ components:
+           minimum: 1
+           default: 3
+           description: cutoff_trace CT02 — minimum number of probes spot-rechecked
++        warburg_residual_tol:
++          type: number
++          minimum: 0
++          default: 0.05
++          description: numerical CHK08 — max relative ||F − F̃||/||F̃|| against the closed-form Warburg oracle
++        warburg_kernel_cutoff_tol:
++          type: number
++          minimum: 0
++          default: 0.000000001
++          description: numerical CHK09 — max |K(T_now − δ)| (live/static cancellation tolerance)
++        mercer_slope_tol:
++          type: number
++          minimum: 0
++          default: 0.4
++          description: numerical CHK12 — tolerance for Mercer eigenvalue log-log slope around −1
+ 
+     CreateJobRequest:
+       oneOf:
+diff --git a/lib/db/src/schema/job-artifacts.ts b/lib/db/src/schema/job-artifacts.ts
+index d37ddfa..d88960b 100644
+--- a/lib/db/src/schema/job-artifacts.ts
++++ b/lib/db/src/schema/job-artifacts.ts
+@@ -16,6 +16,11 @@ export interface NumericalArtifactPayload {
+     cond_I_minus_G: number;
+     dual_truncation_error: number;
+     spectral_tail_error: number;
++    // Warburg closed-form oracle (optional; null when kernel is non-Warburg)
++    warburg_nu?: number | null;
++    closed_form_residual?: number | null;
++    mercer_slope?: number | null;
++    kernel_cutoff_value?: number | null;
+   };
+ }
+ 
+diff --git a/lib/db/src/schema/jobs.ts b/lib/db/src/schema/jobs.ts
+index 574eab5..377a8ae 100644
+--- a/lib/db/src/schema/jobs.ts
++++ b/lib/db/src/schema/jobs.ts
+@@ -27,6 +27,10 @@ export interface PolicyConfig {
+   judge_disagreement_max?: number;
+   min_probes_per_month?: number;
+   min_recheck_count?: number;
++  // Warburg closed-form oracle thresholds (numerical pipeline)
++  warburg_residual_tol?: number;
++  warburg_kernel_cutoff_tol?: number;
++  mercer_slope_tol?: number;
+ }
+ 
+ export interface NumericalDescriptor {
