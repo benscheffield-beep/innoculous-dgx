@@ -4,16 +4,27 @@
  *
  * Closed-form reference oracle for the unified Warburg theorem (TS port of
  * warburg_unified.py). Used by the numerical Editor to produce a closed-form
- * F̃[μ] alongside its numerical F[μ], and by the Verifier to enforce five
- * theorem-level predictions (CHK08–CHK12) against the stored artifact.
+ * F̃[μ] alongside its numerical F[μ], and by the Verifier (CHK08) to enforce
+ * agreement between the numerical pipeline and the analytic identity.
  *
- * The oracle assumes the Warburg pole s = (d+1)/2, so the Bessel order is
- * always ν = s − d/2 = 1/2. This collapses the lattice integral to a closed
- * form involving K_{1/2}(z) = √(π/(2z)) e^(−z), which is exact and cheap.
+ * Convention. The numerical Editor uses k0(t) = exp(−σ²t) for the gaussian
+ * kernel — i.e. NO t^(s−1) prefactor. That maps onto the Warburg
+ * parameterization k0(t) = t^(s−1) e^(−π a² t) with s = 1 and π a² = σ², so
  *
- * For ν ≠ 1/2 (used only by future generalizations) we fall back to a
- * numerical evaluation of K_ν via the integral representation
- *   K_ν(z) = ∫₀^∞ e^(−z cosh t) cosh(ν t) dt.
+ *     A = σ²,   B = π · μᵀ Q⁻¹ μ,   ν = s − d/2 = 1 − d/2.
+ *
+ * For d = 1 we get ν = 1/2 and K_{1/2}(z) = √(π/(2z)) e^(−z) is exact.
+ * For d ≥ 2 we get ν ≤ 0 and the lattice integral is evaluated via the
+ * generic K_ν integral representation
+ *
+ *     K_ν(z) = ∫₀^∞ e^(−z cosh t) cosh(ν t) dt.
+ *
+ * (The canonical Warburg pole s = (d+1)/2 gives ν = 1/2 in any dimension,
+ * but the editor's kernel is the simpler s = 1 form. We honour the editor.)
+ *
+ * The phase validators and Mercer half-integration basis are pure-math
+ * cross-checks of the unified theorem and run as a one-shot startup
+ * self-test in `warburg-self-test.ts`, not on a per-job basis.
  */
 
 import type { Matrix, Vec } from "./math.js";

@@ -34,12 +34,6 @@ export const createJobBodyOnePolicyConfigMinRecheckCountDefault = 3;
 export const createJobBodyOnePolicyConfigWarburgResidualTolDefault = 0.05;
 export const createJobBodyOnePolicyConfigWarburgResidualTolMin = 0;
 
-export const createJobBodyOnePolicyConfigWarburgKernelCutoffTolDefault = 1e-9;
-export const createJobBodyOnePolicyConfigWarburgKernelCutoffTolMin = 0;
-
-export const createJobBodyOnePolicyConfigMercerSlopeTolDefault = 0.4;
-export const createJobBodyOnePolicyConfigMercerSlopeTolMin = 0;
-
 export const createJobBodyTwoJudgeTemperatureDefault = 0;
 export const createJobBodyTwoPolicyConfigSpectralRadiusMaxDefault = 0.999;
 export const createJobBodyTwoPolicyConfigCondLimitDefault = 1000000;
@@ -55,12 +49,6 @@ export const createJobBodyTwoPolicyConfigMinRecheckCountDefault = 3;
 
 export const createJobBodyTwoPolicyConfigWarburgResidualTolDefault = 0.05;
 export const createJobBodyTwoPolicyConfigWarburgResidualTolMin = 0;
-
-export const createJobBodyTwoPolicyConfigWarburgKernelCutoffTolDefault = 1e-9;
-export const createJobBodyTwoPolicyConfigWarburgKernelCutoffTolMin = 0;
-
-export const createJobBodyTwoPolicyConfigMercerSlopeTolDefault = 0.4;
-export const createJobBodyTwoPolicyConfigMercerSlopeTolMin = 0;
 
 export const CreateJobBody = zod.union([
   zod.object({
@@ -135,20 +123,6 @@ export const CreateJobBody = zod.union([
           .default(createJobBodyOnePolicyConfigWarburgResidualTolDefault)
           .describe(
             "numerical CHK08 — max relative ||F − F̃||\/||F̃|| against the closed-form Warburg oracle",
-          ),
-        warburg_kernel_cutoff_tol: zod
-          .number()
-          .min(createJobBodyOnePolicyConfigWarburgKernelCutoffTolMin)
-          .default(createJobBodyOnePolicyConfigWarburgKernelCutoffTolDefault)
-          .describe(
-            "numerical CHK09 — max |K(T_now − δ)| (live\/static cancellation tolerance)",
-          ),
-        mercer_slope_tol: zod
-          .number()
-          .min(createJobBodyOnePolicyConfigMercerSlopeTolMin)
-          .default(createJobBodyOnePolicyConfigMercerSlopeTolDefault)
-          .describe(
-            "numerical CHK12 — tolerance for Mercer eigenvalue log-log slope around −1",
           ),
       })
       .optional()
@@ -232,20 +206,6 @@ export const CreateJobBody = zod.union([
           .default(createJobBodyTwoPolicyConfigWarburgResidualTolDefault)
           .describe(
             "numerical CHK08 — max relative ||F − F̃||\/||F̃|| against the closed-form Warburg oracle",
-          ),
-        warburg_kernel_cutoff_tol: zod
-          .number()
-          .min(createJobBodyTwoPolicyConfigWarburgKernelCutoffTolMin)
-          .default(createJobBodyTwoPolicyConfigWarburgKernelCutoffTolDefault)
-          .describe(
-            "numerical CHK09 — max |K(T_now − δ)| (live\/static cancellation tolerance)",
-          ),
-        mercer_slope_tol: zod
-          .number()
-          .min(createJobBodyTwoPolicyConfigMercerSlopeTolMin)
-          .default(createJobBodyTwoPolicyConfigMercerSlopeTolDefault)
-          .describe(
-            "numerical CHK12 — tolerance for Mercer eigenvalue log-log slope around −1",
           ),
       })
       .optional()

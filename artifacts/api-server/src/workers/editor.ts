@@ -20,8 +20,6 @@ import {
 } from "../lib/math.js";
 import {
   fMuClosedForm,
-  kernelKClosedForm,
-  mercerHalfIntegrationBasis,
   type WarburgParams,
 } from "../lib/warburg.js";
 import type { KernelParams, NumericalDescriptor as JobDescriptor, NumericalArtifactPayload as ArtifactPayload } from "@workspace/db";
@@ -410,8 +408,6 @@ export async function runEditor(descriptor: JobDescriptor): Promise<EditorResult
       spectral_tail_error: spectralTailErr,
       warburg_nu: warburg.nu,
       closed_form_residual: warburg.residual,
-      mercer_slope: warburg.mercerSlope,
-      kernel_cutoff_value: warburg.kernelCutoffValue,
     },
   };
 
@@ -420,9 +416,9 @@ export async function runEditor(descriptor: JobDescriptor): Promise<EditorResult
 
 /**
  * Closed-form Warburg oracle. Recomputes F̃[μ] via the exact Bessel
- * formula at the Warburg pole s=(d+1)/2 for the gaussian kernel case.
- * Returns nulls when the kernel falls outside the oracle's domain so
- * the Verifier can skip its Warburg checks gracefully.
+ * identity for the gaussian kernel case using the editor's convention
+ * s = 1, ν = 1 − d/2. Returns nulls when the kernel falls outside the
+ * oracle's domain so the Verifier can skip CHK08 gracefully.
  */
 function computeWarburgOracle(
   descriptor: JobDescriptor,
@@ -431,11 +427,9 @@ function computeWarburgOracle(
 ): {
   nu: number | null;
   residual: number | null;
-  mercerSlope: number | null;
-  kernelCutoffValue: number | null;
 } {
   if (descriptor.kernel.type !== "gaussian") {
-    return { nu: null, residual: null, mercerSlope: null, kernelCutoffValue: null };
+    return { nu: null, residual: null };
   }
   const sigma = descriptor.kernel.sigma ?? 1.0;
   // Editor's k0(t) for "gaussian" is exp(-σ²t), so in the Warburg parameterization
@@ -474,12 +468,5 @@ function computeWarburgOracle(
   }
   const residual =
     sumF2 > 1e-30 ? Math.sqrt(sumDiff2 / sumF2) : null;
-  const kernelCutoffValue = kernelKClosedForm(params.Tnow - params.delta, params);
-  const mercer = mercerHalfIntegrationBasis(0.5); // half-integration α=1/2 fixed
-  return {
-    nu,
-    residual,
-    mercerSlope: isFinite(mercer.slope) ? mercer.slope : null,
-    kernelCutoffValue,
-  };
+  return { nu, residual };
 }

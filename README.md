@@ -356,7 +356,7 @@ The Editor executes the following 12 steps deterministically for each job. Steps
 
 ## 8. Verifier Subagent — Check Catalogue
 
-All 7 checks run in parallel (`parallel_checks: true`). Maximum runtime budget: 120 seconds.
+All 8 checks (CHK01–CHK08) run in parallel (`parallel_checks: true`). Maximum runtime budget: 120 seconds.
 
 | ID | Name | Condition | Severity | Failure Action |
 |---|---|---|---|---|
@@ -368,10 +368,8 @@ All 7 checks run in parallel (`parallel_checks: true`). Maximum runtime budget: 
 | CHK06 | `causality_check` | Retarded/advanced decomposition correct; `iε` prescription applied | **fail** | Reject; recompute with corrected prescription |
 | CHK07 | `privacy_check` | No sensitive tokens or raw user data embedded in artifact payload | **fail** | Reject; sanitize and recompute |
 | CHK08 | `closed_form_residual` | `‖F − F̃‖ / ‖F̃‖ ≤ policy.warburg_residual_tol` | warn | Recommend increase of register bits `b` |
-| CHK10 | `warburg_integrability` | Warburg `ν < 1` (second descent integrable) | warn | Recommend reducing dimension `d` |
-| CHK12 | `mercer_slope` | Mercer eigenvalue log-log slope ≈ −1 ± `policy.mercer_slope_tol` | warn | Recommend increasing spectral rank `r` |
 
-CHK08, CHK10, and CHK12 are populated by the closed-form Warburg oracle described in §8c. They no-op (skip with no diagnostic) when the kernel falls outside the oracle's domain (e.g. non-gaussian). Two additional Warburg quantities (`warburg_nu` and `kernel_cutoff_value`) are stored as informational diagnostics only — they have no associated check because both are determined by construction (ν depends only on `d`, and `K(T_now − δ)` is identically zero by the latency factor's definition).
+CHK08 is populated by the closed-form Warburg oracle described in §8c. It no-ops (skip with no diagnostic) when the kernel falls outside the oracle's domain (e.g. non-gaussian). The companion quantity `warburg_nu` is stored as an informational diagnostic only — it is determined by construction (ν = 1 − d/2 for the editor's s = 1 convention) and has no associated check. The remaining theorem-level identities (Mercer eigenvalue slope and the five phase validators) depend only on fixed math constants, so they run as a one-shot startup self-test (`src/lib/warburg-self-test.ts`) that aborts boot on failure — they are not stored per-job.
 
 **Verdict rules:**
 
@@ -443,18 +441,18 @@ The numerical Editor is paired with a closed-form **reference oracle** (`src/lib
 
 with `A = σ²`, `B = π μᵀ Q⁻¹ μ`, and `ν = 1 − d/2`. K_{1/2} uses its exact closed form `√(π/(2z)) e^(−z)`; other orders use the integral representation `K_ν(z) = ∫₀^∞ e^(−z cosh t) cosh(ν t) dt`.
 
-The oracle runs at the end of every numerical Editor pass and emits four optional diagnostics on `NumericalArtifactPayload.diagnostics`:
+The oracle runs at the end of every numerical Editor pass and emits two optional diagnostics on `NumericalArtifactPayload.diagnostics`:
 
 | Field | Source | Verifier check |
 |---|---|---|
 | `warburg_nu` | `1 − d/2` for the Editor's `s = 1` convention | — (informational) |
 | `closed_form_residual` | `‖F_numerical − F̃_oracle‖₂ / ‖F̃_oracle‖₂` over non-zero modes | CHK08 |
-| `kernel_cutoff_value` | `K(T_now − δ)` (zero by construction in the latency model) | — (informational) |
-| `mercer_slope` | log-log slope of eigenvalues of (I^{1/2})(I^{1/2})ᵀ on a 60-pt grid | CHK12 |
 
-A typical pass yields `closed_form_residual ≈ 1e−10` (Bessel quadrature precision) when the numerical integrator is healthy; values above `policy.warburg_residual_tol` (default 0.05) flag systematic drift between the numerical pipeline and the analytic theorem and trigger CHK08. `policy` exposes two new tunables (`warburg_residual_tol`, `mercer_slope_tol`) with conservative defaults; `warburg_kernel_cutoff_tol` remains in the schema for forward compatibility but is currently unused.
+A typical pass yields `closed_form_residual ≈ 1e−10` (Bessel quadrature precision) when the numerical integrator is healthy; values above `policy.warburg_residual_tol` (default 0.05) flag systematic drift between the numerical pipeline and the analytic theorem and trigger CHK08.
 
-For non-gaussian kernels, `computeWarburgOracle` returns nulls and the Warburg checks silently skip — preserving the existing pipeline unchanged.
+For non-gaussian kernels, `computeWarburgOracle` returns nulls and CHK08 silently skips — preserving the existing pipeline unchanged.
+
+**Startup self-test.** The remaining theorem identities — the five phase validators (envelope slope = −α, latency cancellation `K(T_now − δ) = 0`, integrability `ν < 1`, Warburg-pole `ν = 1/2`, Mercer slope ≈ −1) — are pure-math cross-checks that depend only on the implementation, not on any per-job input. They run exactly once at server boot via `assertWarburgSelfTest(logger)` in `src/index.ts`; the server refuses to start (and logs a structured error) if any of them fails. This catches numerical-library regressions at deploy time without polluting per-job diagnostics.
 
 ---
 
@@ -593,7 +591,7 @@ The following checklist is structured for a Claude LLM reviewer to execute step-
 
 ### C. Verifier Check Coverage
 
-- [ ] **[BLOCKING] C1** — Confirm all 7 checks (CHK01–CHK07) are implemented in the Verifier worker. Check for a test or code path that exercises each check ID.
+- [ ] **[BLOCKING] C1** — Confirm all 8 checks (CHK01–CHK08) are implemented in the Verifier worker. Check for a test or code path that exercises each check ID.
 - [ ] **[BLOCKING] C2** — Confirm CHK01 (artifact integrity) recomputes `SHA-256(payload)` independently and compares against `job_artifacts.hash`. The hash must not be taken from the artifact itself.
 - [ ] **[BLOCKING] C3** — Confirm CHK06 (causality) verifies the retarded/advanced decomposition and the `iε` prescription. This check must not be a no-op stub.
 - [ ] **[BLOCKING] C4** — Confirm CHK07 (privacy) scans the artifact payload for patterns that would indicate sensitive token or raw user data leakage (e.g. regex scan or field allowlist). This check must not be a no-op stub.

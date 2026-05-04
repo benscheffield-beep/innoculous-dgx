@@ -16,11 +16,12 @@ export interface NumericalArtifactPayload {
     cond_I_minus_G: number;
     dual_truncation_error: number;
     spectral_tail_error: number;
-    // Warburg closed-form oracle (optional; null when kernel is non-Warburg)
+    // Warburg closed-form oracle (optional; null when kernel is non-Warburg).
+    // `warburg_nu` is informational (determined by d alone); `closed_form_residual`
+    // drives CHK08. Mercer-basis and phase-validator checks run once at server
+    // startup in warburg-self-test.ts and are not stored per-job.
     warburg_nu?: number | null;
     closed_form_residual?: number | null;
-    mercer_slope?: number | null;
-    kernel_cutoff_value?: number | null;
   };
 }
 

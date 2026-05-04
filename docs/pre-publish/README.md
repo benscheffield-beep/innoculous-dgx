@@ -3,13 +3,14 @@
 This directory contains the documents prepared for code review prior to
 publishing the Warburg-oracle change set.
 
-| File              | Purpose                                                          |
-|-------------------|------------------------------------------------------------------|
-| `REVIEW.md`       | Comprehensive review packet — scope, architecture, risk, evidence |
-| `CHECKLIST.md`    | Go/no-go checklist with sign-off boxes                            |
-| `CHANGES.diff`    | Raw `git diff` of the seven core source files (no codegen noise)  |
+| File                | Purpose                                                          |
+|---------------------|------------------------------------------------------------------|
+| `REVIEW.md`         | Revision 2 — resolves all 7 blockers from the rev-1 NO-GO        |
+| `CHECKLIST.md`      | Go/no-go checklist with rev-1 blockers explicitly closed          |
+| `CHANGES.diff`      | Raw `git diff` of hand-written source files (no codegen noise)    |
+| `warburg.test.ts`   | Verbatim copy of the in-tree test suite (132 passing tests)       |
 
-**Suggested reading order:** `REVIEW.md` → `CHANGES.diff` → `CHECKLIST.md`.
+**Suggested reading order:** `REVIEW.md` → `warburg.test.ts` → `CHANGES.diff` → `CHECKLIST.md`.
 
 To regenerate the diff against the pre-Warburg baseline:
 

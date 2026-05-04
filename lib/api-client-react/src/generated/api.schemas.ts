@@ -77,16 +77,6 @@ export interface PolicyConfig {
    * @minimum 0
    */
   warburg_residual_tol?: number;
-  /**
-   * numerical CHK09 — max |K(T_now − δ)| (live/static cancellation tolerance)
-   * @minimum 0
-   */
-  warburg_kernel_cutoff_tol?: number;
-  /**
-   * numerical CHK12 — tolerance for Mercer eigenvalue log-log slope around −1
-   * @minimum 0
-   */
-  mercer_slope_tol?: number;
 }
 
 /**
