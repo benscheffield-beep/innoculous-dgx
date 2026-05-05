@@ -106,7 +106,7 @@ export default function Tutorial() {
           </div>
           <div className="md:col-span-2 p-4 rounded-md bg-primary/5 border border-primary/20 flex items-center gap-2">
             <Flame className="w-4 h-4 text-primary" />
-            <h4 className="font-semibold text-sm uppercase tracking-wide text-primary">Daemon chat</h4>
+            <h4 className="font-semibold text-sm uppercase tracking-wide text-primary">Daemon mode</h4>
           </div>
         </CardContent>
       </Card>
@@ -138,7 +138,7 @@ export default function Tutorial() {
           </Step>
           <Step num="3" title="Retrieve & converse">
             On the innoculant detail page you get the unified verdict, the merged relic, the
-            full diagnostic table, and a Daemon chat panel — a model persona conditioned on
+            full diagnostic table, and a Daemon mode panel — a model persona conditioned on
             the relic. Toggle <span className="font-mono text-foreground">Operator Mode</span>{" "}
             in the sidebar to reveal advanced metrics.
           </Step>

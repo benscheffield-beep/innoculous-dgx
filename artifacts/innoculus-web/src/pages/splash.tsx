@@ -745,7 +745,7 @@ export default function Splash() {
             role="button"
             aria-label={
               chatOpen
-                ? "Daemon chat is open — click to replay greeting"
+                ? "Daemon mode is open — click to replay greeting"
                 : "Summon the Daemon"
             }
             aria-pressed={chatOpen}
@@ -892,14 +892,14 @@ export default function Splash() {
           }}
           data-testid="daemon-chat-surface"
           role="region"
-          aria-label="Daemon chat"
+          aria-label="Daemon mode"
         >
           {/* Close affordance — minimal, ghost-like; sits in the top-right
               corner so it doesn't compete with the transcript. */}
           <button
             type="button"
             onClick={closeDaemonChat}
-            aria-label="Close Daemon chat"
+            aria-label="Close Daemon mode"
             data-testid="button-daemon-close"
             className="absolute top-3 right-3 text-foreground/30 hover:text-foreground/80 transition-colors p-1 rounded-full"
           >
