@@ -18,7 +18,7 @@ function HealthIndicator() {
 
   return (
     <div className="flex items-center gap-2" data-testid="status-health">
-      <div className={`w-2 h-2 rounded-full ${isHealthy ? 'bg-primary shadow-[0_0_8px_hsla(185,81%,54%,0.8)]' : 'bg-destructive shadow-[0_0_8px_hsla(11,80%,50%,0.8)]'}`} />
+      <div className={`w-2 h-2 rounded-full ${isHealthy ? 'bg-primary shadow-[0_0_8px_hsla(0,0%,92%,0.8)]' : 'bg-destructive shadow-[0_0_8px_hsla(11,80%,50%,0.8)]'}`} />
       <span className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
         {isHealthy ? 'SYS OK' : 'SYS ERR'}
       </span>

@@ -88,44 +88,44 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  /* Deep slate/navy for calm instrument readout */
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
+  /* Pure black background to match splash */
+  --background: 0 0% 0%;
+  --foreground: 0 0% 98%;
 
-  --border: 217 32% 17%;
-  --input: 217 32% 17%;
-  --ring: 185 81% 54%;
+  --border: 0 0% 14%;
+  --input: 0 0% 14%;
+  --ring: 0 0% 92%;
 
-  --card: 222 47% 15%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 217 32% 17%;
+  --card: 0 0% 6%;
+  --card-foreground: 0 0% 98%;
+  --card-border: 0 0% 14%;
 
-  --popover: 222 47% 15%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 217 32% 17%;
+  --popover: 0 0% 6%;
+  --popover-foreground: 0 0% 98%;
+  --popover-border: 0 0% 14%;
 
-  /* Bright teal/cyan for primary actions/indicators */
-  --primary: 185 81% 54%;
-  --primary-foreground: 222 47% 11%;
+  /* White / light-silver for primary actions/indicators */
+  --primary: 0 0% 92%;
+  --primary-foreground: 0 0% 0%;
 
-  --secondary: 217 32% 17%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 98%;
 
-  --muted: 217 32% 17%;
-  --muted-foreground: 215 20.2% 65.1%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 65%;
 
-  --accent: 185 81% 20%;
-  --accent-foreground: 185 81% 54%;
+  --accent: 0 0% 16%;
+  --accent-foreground: 0 0% 92%;
 
   /* Soft coral/orange for destructive/warn */
   --destructive: 11 80% 50%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive-foreground: 0 0% 98%;
 
-  --chart-1: 185 81% 54%;
-  --chart-2: 217 91% 60%;
+  --chart-1: 0 0% 92%;
+  --chart-2: 0 0% 70%;
   --chart-3: 11 80% 50%;
   --chart-4: 142 71% 45%;
-  --chart-5: 280 65% 60%;
+  --chart-5: 0 0% 50%;
 
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-serif: Georgia, serif;
@@ -141,33 +141,33 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  --border: 217 32% 17%;
-  --input: 217 32% 17%;
-  --ring: 185 81% 54%;
-  --card: 222 47% 15%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 217 32% 17%;
-  --popover: 222 47% 15%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 217 32% 17%;
-  --primary: 185 81% 54%;
-  --primary-foreground: 222 47% 11%;
-  --secondary: 217 32% 17%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217 32% 17%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 185 81% 20%;
-  --accent-foreground: 185 81% 54%;
+  --background: 0 0% 0%;
+  --foreground: 0 0% 98%;
+  --border: 0 0% 14%;
+  --input: 0 0% 14%;
+  --ring: 0 0% 92%;
+  --card: 0 0% 6%;
+  --card-foreground: 0 0% 98%;
+  --card-border: 0 0% 14%;
+  --popover: 0 0% 6%;
+  --popover-foreground: 0 0% 98%;
+  --popover-border: 0 0% 14%;
+  --primary: 0 0% 92%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 65%;
+  --accent: 0 0% 16%;
+  --accent-foreground: 0 0% 92%;
   --destructive: 11 80% 50%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive-foreground: 0 0% 98%;
   
-  --chart-1: 185 81% 54%;
-  --chart-2: 217 91% 60%;
+  --chart-1: 0 0% 92%;
+  --chart-2: 0 0% 70%;
   --chart-3: 11 80% 50%;
   --chart-4: 142 71% 45%;
-  --chart-5: 280 65% 60%;
+  --chart-5: 0 0% 50%;
 }
 
 @layer base {
