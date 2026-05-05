@@ -202,7 +202,7 @@ export default function Tutorial() {
       {/* Quick start */}
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle>Quick Start</CardTitle>
+          <CardTitle>Elementary Innoculation</CardTitle>
           <CardDescription>Run your first innoculant in three steps.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
