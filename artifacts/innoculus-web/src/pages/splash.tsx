@@ -89,24 +89,45 @@ export default function Splash() {
             </filter>
           </defs>
 
-          {/* Outer lens (the algorithm enclosure) */}
+          {/* Outer lens (the algorithm enclosure) — solid base */}
           <path
             d="M 200 60 C 60 220, 60 500, 200 660"
             fill="none"
             stroke="url(#ic-stroke)"
-            strokeWidth="1.6"
+            strokeOpacity="0.75"
+            strokeWidth="1.4"
             strokeLinecap="round"
-            className="animate-[innoculus-flow_8s_linear_infinite]"
-            style={{ strokeDasharray: "6 10" }}
           />
           <path
             d="M 200 60 C 340 220, 340 500, 200 660"
             fill="none"
             stroke="url(#ic-stroke)"
-            strokeWidth="1.6"
+            strokeOpacity="0.75"
+            strokeWidth="1.4"
             strokeLinecap="round"
-            className="animate-[innoculus-flow_8s_linear_infinite_reverse]"
-            style={{ strokeDasharray: "6 10" }}
+          />
+          {/* Outer lens — traveling comet highlight (apparent motion) */}
+          <path
+            d="M 200 60 C 60 220, 60 500, 200 660"
+            fill="none"
+            stroke="#ffffff"
+            strokeOpacity="0.95"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            pathLength={100}
+            className="animate-[innoculus-comet_6s_linear_infinite]"
+            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+          />
+          <path
+            d="M 200 60 C 340 220, 340 500, 200 660"
+            fill="none"
+            stroke="#ffffff"
+            strokeOpacity="0.95"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            pathLength={100}
+            className="animate-[innoculus-comet_6s_linear_infinite_reverse]"
+            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
           />
 
           {/* Vertical telemetry spine */}
@@ -156,7 +177,7 @@ export default function Splash() {
             style={{ animationDelay: "1.4s" }}
           />
 
-          {/* Crossing telemetry curves — innermost oval, marches opposite to outer lens */}
+          {/* Innermost oval — solid base */}
           <path
             d="M 200 220 C 145 290, 145 430, 200 500"
             fill="none"
@@ -164,8 +185,6 @@ export default function Splash() {
             strokeOpacity="0.6"
             strokeWidth="1.2"
             strokeLinecap="round"
-            className="animate-[innoculus-flow_8s_linear_infinite_reverse]"
-            style={{ strokeDasharray: "6 10" }}
           />
           <path
             d="M 200 220 C 255 290, 255 430, 200 500"
@@ -174,8 +193,29 @@ export default function Splash() {
             strokeOpacity="0.6"
             strokeWidth="1.2"
             strokeLinecap="round"
-            className="animate-[innoculus-flow_8s_linear_infinite]"
-            style={{ strokeDasharray: "6 10" }}
+          />
+          {/* Innermost oval — comet highlight, opposite direction to outer lens */}
+          <path
+            d="M 200 220 C 145 290, 145 430, 200 500"
+            fill="none"
+            stroke="#ffffff"
+            strokeOpacity="0.9"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            pathLength={100}
+            className="animate-[innoculus-comet_6s_linear_infinite_reverse]"
+            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+          />
+          <path
+            d="M 200 220 C 255 290, 255 430, 200 500"
+            fill="none"
+            stroke="#ffffff"
+            strokeOpacity="0.9"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            pathLength={100}
+            className="animate-[innoculus-comet_6s_linear_infinite]"
+            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
           />
 
           {/* Interior nodes — silicon grey body, white halo */}

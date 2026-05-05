@@ -7,6 +7,11 @@
 @keyframes innoculus-flow {
   to { stroke-dashoffset: -160; }
 }
+/* Bright "comet" sparkle traveling once per cycle along a pathLength=100 stroke */
+@keyframes innoculus-comet {
+  0%   { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -106; }
+}
 @keyframes innoculus-pulse-stroke {
   0%, 100% { stroke-opacity: 0.35; }
   50%      { stroke-opacity: 0.85; }
