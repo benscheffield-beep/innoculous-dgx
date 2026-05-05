@@ -239,11 +239,23 @@ router.get("/jobs", async (req, res) => {
   });
 });
 
-router.get("/jobs/stats", async (_req, res) => {
-  const totalRows = await db.select({ n: count() }).from(jobsTable);
+router.get("/jobs/stats", async (req, res) => {
+  // Optional kind filter scopes total/by_status/by_verdict/recent_24h while
+  // leaving by_kind as a global breakdown so the dashboard can still surface
+  // the unified vs legacy split.
+  const kindParam = typeof req.query["kind"] === "string" ? req.query["kind"] : undefined;
+  const allowedKinds = new Set(["numerical", "cutoff_trace", "innoculation"]);
+  const kindFilter = kindParam && allowedKinds.has(kindParam) ? kindParam : undefined;
+  const kindWhere = kindFilter ? eq(jobsTable.kind, kindFilter) : undefined;
+
+  const totalRows = await db
+    .select({ n: count() })
+    .from(jobsTable)
+    .where(kindWhere ?? sql`true`);
   const statusRows = await db
     .select({ status: jobsTable.status, n: count() })
     .from(jobsTable)
+    .where(kindWhere ?? sql`true`)
     .groupBy(jobsTable.status);
   const kindRows = await db
     .select({ kind: jobsTable.kind, n: count() })
@@ -258,11 +270,15 @@ router.get("/jobs/stats", async (_req, res) => {
       jobDiagnosticsTable,
       eq(jobDiagnosticsTable.artifactId, jobsTable.currentArtifactId),
     )
+    .where(kindWhere ?? sql`true`)
     .groupBy(jobDiagnosticsTable.verdict);
+  const recentWhere = kindWhere
+    ? sql`${jobsTable.kind} = ${kindFilter} AND ${jobsTable.createdAt} >= NOW() - INTERVAL '24 hours'`
+    : sql`${jobsTable.createdAt} >= NOW() - INTERVAL '24 hours'`;
   const recentRows = await db
     .select({ n: count() })
     .from(jobsTable)
-    .where(sql`${jobsTable.createdAt} >= NOW() - INTERVAL '24 hours'`);
+    .where(recentWhere);
 
   const by_status: Record<string, number> = {};
   for (const row of statusRows) by_status[row.status] = Number(row.n);

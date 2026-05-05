@@ -31,8 +31,11 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useGetJobStats({
-    query: { queryKey: getGetJobStatsQueryKey(), refetchInterval: 5000 }
+  // Scope headline metrics to unified innoculations only; legacy single-kind
+  // jobs are intentionally excluded from the dashboard's at-a-glance view.
+  const statsParams = { kind: "innoculation" as const };
+  const { data: stats, isLoading: statsLoading } = useGetJobStats(statsParams, {
+    query: { queryKey: getGetJobStatsQueryKey(statsParams), refetchInterval: 5000 }
   });
 
   // Hide legacy single-kind jobs from at-a-glance views — only the unified

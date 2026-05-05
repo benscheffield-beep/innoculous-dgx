@@ -33,6 +33,8 @@ export * from "./dispatchVerifyRequest";
 export * from "./dispatchVerifyRequestDiagnostics";
 export * from "./dispatchWorkRequest";
 export * from "./errorResponse";
+export * from "./getJobStatsKind";
+export * from "./getJobStatsParams";
 export * from "./healthStatus";
 export * from "./innoculationArtifactPayload";
 export * from "./innoculationArtifactPayloadKind";

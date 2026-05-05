@@ -278,10 +278,10 @@ export default function JobDetail() {
             <div className="absolute left-0 top-1/2 w-full h-0.5 bg-white/5 -z-10 -translate-y-1/2"></div>
 
             {([
-              { key: "queued", label: "queued" },
-              { key: "editor", label: "daemon" },
-              { key: "verifying", label: "judging" },
-              { key: "complete", label: "complete" },
+              { key: "queued", label: "Reckoner" },
+              { key: "editor", label: "Daemon" },
+              { key: "verifying", label: "Judge" },
+              { key: "complete", label: "Relic" },
             ] as const).map(({ key, label }, i) => {
               const active = i <= stepIndex;
               const failedVerifying = job.status === "failed" && i === 2;

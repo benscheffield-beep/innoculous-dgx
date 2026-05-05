@@ -347,7 +347,14 @@ paths:
       operationId: getJobStats
       tags: [jobs]
       summary: Job stats summary
-      description: Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards.
+      description: Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards. When `kind` is supplied, `total`, `by_status`, `by_verdict`, and `recent_24h` are scoped to that kind; `by_kind` always reports global counts.
+      parameters:
+        - in: query
+          name: kind
+          required: false
+          schema:
+            type: string
+            enum: [numerical, cutoff_trace, innoculation]
       responses:
         "200":
           description: Stats snapshot

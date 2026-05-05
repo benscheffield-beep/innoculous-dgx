@@ -529,3 +529,16 @@ export const ListJobsKind = {
   cutoff_trace: "cutoff_trace",
   innoculation: "innoculation",
 } as const;
+
+export type GetJobStatsParams = {
+  kind?: GetJobStatsKind;
+};
+
+export type GetJobStatsKind =
+  (typeof GetJobStatsKind)[keyof typeof GetJobStatsKind];
+
+export const GetJobStatsKind = {
+  numerical: "numerical",
+  cutoff_trace: "cutoff_trace",
+  innoculation: "innoculation",
+} as const;

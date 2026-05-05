@@ -976,9 +976,13 @@ export const ChatWithDaemonResponse = zod.object({
 });
 
 /**
- * Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards.
+ * Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards. When `kind` is supplied, `total`, `by_status`, `by_verdict`, and `recent_24h` are scoped to that kind; `by_kind` always reports global counts.
  * @summary Job stats summary
  */
+export const GetJobStatsQueryParams = zod.object({
+  kind: zod.enum(["numerical", "cutoff_trace", "innoculation"]).optional(),
+});
+
 export const GetJobStatsResponse = zod
   .object({
     total: zod.number(),

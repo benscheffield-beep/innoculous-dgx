@@ -23,6 +23,7 @@ import type {
   DispatchVerifyRequest,
   DispatchWorkRequest,
   ErrorResponse,
+  GetJobStatsParams,
   HealthStatus,
   Job,
   JobArtifact,
@@ -995,42 +996,60 @@ export const useChatWithDaemon = <
 };
 
 /**
- * Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards.
+ * Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards. When `kind` is supplied, `total`, `by_status`, `by_verdict`, and `recent_24h` are scoped to that kind; `by_kind` always reports global counts.
  * @summary Job stats summary
  */
-export const getGetJobStatsUrl = () => {
-  return `/api/jobs/stats`;
+export const getGetJobStatsUrl = (params?: GetJobStatsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/jobs/stats?${stringifiedParams}`
+    : `/api/jobs/stats`;
 };
 
-export const getJobStats = async (options?: RequestInit): Promise<JobStats> => {
-  return customFetch<JobStats>(getGetJobStatsUrl(), {
+export const getJobStats = async (
+  params?: GetJobStatsParams,
+  options?: RequestInit,
+): Promise<JobStats> => {
+  return customFetch<JobStats>(getGetJobStatsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetJobStatsQueryKey = () => {
-  return [`/api/jobs/stats`] as const;
+export const getGetJobStatsQueryKey = (params?: GetJobStatsParams) => {
+  return [`/api/jobs/stats`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetJobStatsQueryOptions = <
   TData = Awaited<ReturnType<typeof getJobStats>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getJobStats>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: GetJobStatsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetJobStatsQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getGetJobStatsQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getJobStats>>> = ({
     signal,
-  }) => getJobStats({ signal, ...requestOptions });
+  }) => getJobStats(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getJobStats>>,
@@ -1051,15 +1070,18 @@ export type GetJobStatsQueryError = ErrorType<unknown>;
 export function useGetJobStats<
   TData = Awaited<ReturnType<typeof getJobStats>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getJobStats>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetJobStatsQueryOptions(options);
+>(
+  params?: GetJobStatsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetJobStatsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
