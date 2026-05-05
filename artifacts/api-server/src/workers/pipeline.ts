@@ -16,7 +16,7 @@ import {
   type InnoculationArtifactPayload,
 } from "@workspace/db";
 import { runEditor } from "./editor.js";
-import { runVerifier, type PolicyConfig as VerifierPolicy, type Verdict, computeArtifactHash } from "./verifier.js";
+import { runVerifier, signArtifact, type PolicyConfig as VerifierPolicy, type Verdict, computeArtifactHash } from "./verifier.js";
 import { runCutoffEditor } from "./cutoff-editor.js";
 import { runCutoffVerifier } from "./cutoff-verifier.js";
 import type { DiagnosticIssue } from "@workspace/db";
@@ -147,7 +147,7 @@ function collectInnoculationIssues(p: InnoculationArtifactPayload): DiagnosticIs
 async function runInnoculationCycle(
   descriptor: InnoculationDescriptor,
   policy: Partial<VerifierPolicy>,
-): Promise<InnoculationArtifactPayload> {
+): Promise<{ artifact: InnoculationArtifactPayload; mergedMetrics: Record<string, unknown> }> {
   const numDescriptor: NumericalDescriptor = {
     kind: "numerical",
     ...descriptor.numerical,
@@ -197,14 +197,20 @@ async function runInnoculationCycle(
   } as CutoffArtifactPayload;
 
   return {
-    kind: "innoculation",
-    verdict: worstVerdict(numVerify.verdict, ctVerify.verdict),
-    sub_verdicts: {
-      numerical: numVerify.verdict,
-      cutoff_trace: ctVerify.verdict,
+    artifact: {
+      kind: "innoculation",
+      verdict: worstVerdict(numVerify.verdict, ctVerify.verdict),
+      sub_verdicts: {
+        numerical: numVerify.verdict,
+        cutoff_trace: ctVerify.verdict,
+      },
+      numerical: numWithIssues,
+      cutoff_trace: ctWithIssues,
     },
-    numerical: numWithIssues,
-    cutoff_trace: ctWithIssues,
+    mergedMetrics: {
+      numerical: numVerify.recomputed_metrics,
+      cutoff_trace: ctVerify.recomputed_metrics,
+    },
   };
 }
 
@@ -224,9 +230,12 @@ async function runEditorVerifierCycle(
   }
 
   let artifact: ArtifactPayload;
+  let innoculationMergedMetrics: Record<string, unknown> | null = null;
   const dKind = (descriptor as { kind?: string }).kind;
   if (dKind === "innoculation") {
-    artifact = await runInnoculationCycle(descriptor as InnoculationDescriptor, policy);
+    const r = await runInnoculationCycle(descriptor as InnoculationDescriptor, policy);
+    artifact = r.artifact;
+    innoculationMergedMetrics = r.mergedMetrics;
   } else if (dKind === "cutoff_trace") {
     const r = await runCutoffEditor(descriptor as CutoffTraceDescriptor);
     artifact = r.artifact;
@@ -259,7 +268,7 @@ async function runEditorVerifierCycle(
     const innoc = artifact;
     verdict = innoc.verdict;
     issues = collectInnoculationIssues(innoc);
-    signed_proof = `innoculation:${hash}`;
+    signed_proof = signArtifact(hash, innoculationMergedMetrics ?? {}, verdict);
     // Store the merged numerical sub-payload's flat metrics in the diagnostics
     // row so existing diagnostics-based dashboards keep working. The full
     // sub-payload data lives in the artifact payload itself.
