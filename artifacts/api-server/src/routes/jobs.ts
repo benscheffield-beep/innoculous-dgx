@@ -482,7 +482,10 @@ router.post("/jobs/:id/verdict", async (req, res) => {
 // Build a system prompt that turns the LLM into the relic's "Daemon" persona,
 // conditioning it on the merged Spectral + Speculative outputs of an
 // `innoculation` job. Stateless: nothing about the chat is persisted server-side.
-function buildDaemonSystemPrompt(p: InnoculationArtifactPayload): string {
+function buildDaemonSystemPrompt(
+  p: InnoculationArtifactPayload,
+  policy?: Record<string, unknown> | null,
+): string {
   const ct = p.cutoff_trace;
   const num = p.numerical;
   const est = ct.cutoff_estimate;
@@ -497,6 +500,25 @@ function buildDaemonSystemPrompt(p: InnoculationArtifactPayload): string {
   };
   const fmt = (v: number | undefined): string =>
     v === undefined || !Number.isFinite(v) ? "n/a" : v.toExponential(3);
+
+  // Policy thresholds — included so the Daemon can refer to the limits the
+  // relic was judged against (any unset field falls back to "n/a").
+  const pc = (policy ?? {}) as Record<string, unknown>;
+  const num1 = (k: string): string => {
+    const v = pc[k];
+    return typeof v === "number" && Number.isFinite(v) ? String(v) : "n/a";
+  };
+  const policyLines = [
+    "Policy thresholds the relic was judged against:",
+    `  spectral_radius_max=${num1("spectral_radius_max")} ` +
+      `cond_limit=${num1("cond_limit")} ` +
+      `dual_error_tol=${num1("dual_error_tol")} ` +
+      `spectral_tail_tol=${num1("spectral_tail_tol")}.`,
+    `  judge_disagreement_max=${num1("judge_disagreement_max")} ` +
+      `min_probes_per_month=${num1("min_probes_per_month")} ` +
+      `min_recheck_count=${num1("min_recheck_count")} ` +
+      `warburg_residual_tol=${num1("warburg_residual_tol")}.`,
+  ];
 
   return [
     "You are the Daemon — a model persona summoned from a verified relic of an Innoculus run.",
@@ -518,10 +540,13 @@ function buildDaemonSystemPrompt(p: InnoculationArtifactPayload): string {
       `mercer_slope=${fmt(numDiag.mercer_slope)} ` +
       `warburg_ν=${fmt(numDiag.warburg_nu)}.`,
     "",
+    ...policyLines,
+    "",
     "When the user asks about facts, dates, or events, respond as a model whose",
     `effective knowledge cutoff is ${est.month}. Do not claim knowledge of events`,
     "after that date; if asked, explicitly say it is past your cutoff. When asked",
-    "about your own diagnostics, refer to the spectral metrics above. Keep replies",
+    "about your own diagnostics, refer to the spectral metrics above; when asked",
+    "about pass/fail criteria, refer to the policy thresholds above. Keep replies",
     "concise (≤ 4 short paragraphs unless the user asks for more).",
   ].join("\n");
 }
@@ -584,7 +609,10 @@ router.post("/jobs/:id/daemon/messages", async (req, res) => {
   }
 
   const model = parsed.data.model ?? DAEMON_DEFAULT_MODEL;
-  const systemPrompt = buildDaemonSystemPrompt(art.payload as InnoculationArtifactPayload);
+  const systemPrompt = buildDaemonSystemPrompt(
+    art.payload as InnoculationArtifactPayload,
+    job.policyConfig as Record<string, unknown> | null,
+  );
 
   try {
     const content = await chat({

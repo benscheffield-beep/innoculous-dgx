@@ -171,7 +171,7 @@ export default function Submit() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Initiate Innoculants</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Initiate Innoculation</h1>
         <p className="text-muted-foreground mt-2 font-mono text-sm">
           One innoculation runs both Spectral and Speculative phases and seals the result as a single relic.
         </p>
