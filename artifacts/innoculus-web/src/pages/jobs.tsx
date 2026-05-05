@@ -64,7 +64,7 @@ export default function Jobs() {
                       </div>
                       <div className="flex items-center gap-3 mt-1.5">
                         <span className="text-xs text-muted-foreground bg-white/5 px-2 py-0.5 rounded font-mono uppercase">
-                          {job.kind.replace('_', ' ')}
+                          {job.kind === 'cutoff_trace' ? 'speculative' : 'spectral'}
                         </span>
                         {job.retry_count > 0 && (
                           <span className="text-xs text-yellow-500/80 flex items-center gap-1">

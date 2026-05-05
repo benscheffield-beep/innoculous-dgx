@@ -64,12 +64,12 @@ export default function Dashboard() {
             description={`${stats.by_verdict?.pass || 0} passed`}
           />
           <StatCard 
-            title="Numerical Innoculants" 
+            title="Spectral Innoculants" 
             value={stats.by_kind?.numerical || 0} 
             icon={BarChart3} 
           />
           <StatCard 
-            title="Cutoff Probes" 
+            title="Speculative Innoculants" 
             value={stats.by_kind?.cutoff_trace || 0} 
             icon={Clock} 
           />
@@ -98,7 +98,7 @@ export default function Dashboard() {
                     <StatusBadge status={job.status} />
                     <div>
                       <div className="font-mono text-sm font-medium text-foreground">{job.id.split('-')[0]}</div>
-                      <div className="text-xs text-muted-foreground mt-1 capitalize">{job.kind.replace('_', ' ')}</div>
+                      <div className="text-xs text-muted-foreground mt-1 capitalize">{job.kind === 'cutoff_trace' ? 'speculative' : 'spectral'}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 text-right">

@@ -201,8 +201,8 @@ export default function Submit() {
         <CardContent className="p-6">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
             <TabsList className="mb-6 grid grid-cols-2 bg-black/20">
-              <TabsTrigger value="numerical" data-testid="tab-numerical">Numerical</TabsTrigger>
-              <TabsTrigger value="cutoff_trace" data-testid="tab-cutoff-trace">Cutoff Trace</TabsTrigger>
+              <TabsTrigger value="numerical" data-testid="tab-numerical">Spectral</TabsTrigger>
+              <TabsTrigger value="cutoff_trace" data-testid="tab-cutoff-trace">Speculative</TabsTrigger>
             </TabsList>
 
             <TabsContent value="numerical">
@@ -339,7 +339,7 @@ export default function Submit() {
 
                   <Button type="submit" disabled={createJob.isPending} className="w-full" data-testid="button-submit-job">
                     {createJob.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Initiate Numerical Innoculant
+                    Initiate Spectral Innoculant
                   </Button>
                 </form>
               </Form>
@@ -423,7 +423,7 @@ export default function Submit() {
 
                   <Button type="submit" disabled={createJob.isPending} className="w-full" data-testid="button-submit-job">
                     {createJob.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Initiate Trace Innoculant
+                    Initiate Speculative Innoculant
                   </Button>
                 </form>
               </Form>

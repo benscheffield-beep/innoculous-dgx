@@ -86,8 +86,8 @@ export default function Tutorial() {
                 Daemon
               </h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                The Daemon performs the numerical work — running spectral self-force
-                computations, evaluating cutoff sweeps, and producing raw output.
+                The Daemon performs the spectral self-force computations, evaluating
+                cutoff sweeps, and producing raw output.
               </p>
             </div>
             <div>
@@ -123,7 +123,7 @@ export default function Tutorial() {
           <div className="p-4 rounded-md bg-black/30 border border-white/5">
             <div className="flex items-center gap-2 mb-2">
               <BarChart3 className="w-4 h-4 text-primary" />
-              <h4 className="font-semibold text-sm uppercase tracking-wide">Numerical</h4>
+              <h4 className="font-semibold text-sm uppercase tracking-wide">Spectral</h4>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
               A single spectral self-force evaluation at a fixed configuration. Returns
@@ -133,7 +133,7 @@ export default function Tutorial() {
           <div className="p-4 rounded-md bg-black/30 border border-white/5">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-primary" />
-              <h4 className="font-semibold text-sm uppercase tracking-wide">Cutoff Trace</h4>
+              <h4 className="font-semibold text-sm uppercase tracking-wide">Speculative</h4>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
               A sweep across cutoff values, producing a trace that lets you visualize
@@ -191,7 +191,7 @@ export default function Tutorial() {
             <Link href="/submit" className="text-primary hover:underline inline-flex items-center gap-1">
               <Play className="w-3 h-3" /> Initiate Innoculants
             </Link>{" "}
-            and pick a tab — Numerical for a single evaluation, Cutoff Trace for a sweep.
+            and pick a tab — Spectral for a single evaluation, Speculative for a sweep.
             Fill the form and submit.
           </Step>
           <Step num="2" title="Watch it move through the innoculum">
