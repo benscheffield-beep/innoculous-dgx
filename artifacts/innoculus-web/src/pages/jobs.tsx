@@ -1,11 +1,23 @@
 import { useState } from "react";
-import { useListJobs, getListJobsQueryKey } from "@workspace/api-client-react";
+import {
+  useListJobs,
+  getListJobsQueryKey,
+  type ListJobsParams,
+  type ListJobsKind,
+} from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Verdict = 'complete' | 'complete_with_warnings' | 'failed' | 'queued' | 'running';
 
@@ -29,12 +41,60 @@ function bucketOf(status: string): Verdict {
   }
 }
 
+// Filter options for the kind dropdown. "all" omits the API filter so
+// legacy single-phase relics (numerical = Spectral, cutoff_trace =
+// Speculative) become discoverable without typing the full /jobs/:id URL.
+type KindFilter = ListJobsKind | "all";
+
+const KIND_OPTIONS: { value: KindFilter; label: string; title: string; subtitle: string; emptyText: string; chip: string }[] = [
+  {
+    value: "innoculation",
+    label: "Unified Innoculations",
+    title: "All Innoculations",
+    subtitle: "Innoculant histories",
+    emptyText: "No innoculations found.",
+    chip: "innoculation",
+  },
+  {
+    value: "numerical",
+    label: "Spectral (legacy)",
+    title: "Legacy Spectral Jobs",
+    subtitle: "Legacy single-phase Spectral relics",
+    emptyText: "No legacy Spectral jobs found.",
+    chip: "numerical",
+  },
+  {
+    value: "cutoff_trace",
+    label: "Speculative (legacy)",
+    title: "Legacy Speculative Jobs",
+    subtitle: "Legacy single-phase Speculative relics",
+    emptyText: "No legacy Speculative jobs found.",
+    chip: "cutoff_trace",
+  },
+  {
+    value: "all",
+    label: "All kinds",
+    title: "All Jobs",
+    subtitle: "Unified + legacy archive",
+    emptyText: "No jobs found.",
+    chip: "",
+  },
+];
+
 export default function Jobs() {
   const [page, setPage] = useState(1);
+  const [kindFilter, setKindFilter] = useState<KindFilter>("innoculation");
   const pageSize = 30;
 
-  // Hide legacy single-kind jobs from the list. Old direct URLs still resolve.
-  const listParams = { page, page_size: pageSize, kind: "innoculation" as const };
+  const activeOption = KIND_OPTIONS.find(o => o.value === kindFilter) ?? KIND_OPTIONS[0]!;
+
+  // Default stays "innoculation" so the unified view remains clean. Switching
+  // the dropdown to numerical/cutoff_trace surfaces legacy jobs that would
+  // otherwise only be reachable by remembering the /jobs/:id URL.
+  const listParams: ListJobsParams =
+    kindFilter === "all"
+      ? { page, page_size: pageSize }
+      : { page, page_size: pageSize, kind: kindFilter };
   const { data, isLoading } = useListJobs(listParams, {
     query: { queryKey: getListJobsQueryKey(listParams), refetchInterval: 10000 }
   });
@@ -52,10 +112,31 @@ export default function Jobs() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">All Innoculations</h1>
-          <p className="text-muted-foreground mt-2 font-mono text-sm">Innoculant histories</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground" data-testid="text-jobs-title">{activeOption.title}</h1>
+          <p className="text-muted-foreground mt-2 font-mono text-sm">{activeOption.subtitle}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Kind</span>
+          <Select
+            value={kindFilter}
+            onValueChange={(v) => {
+              setKindFilter(v as KindFilter);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-56 bg-card/50 border-white/10" data-testid="select-kind-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {KIND_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value} data-testid={`option-kind-${opt.value}`}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -87,6 +168,9 @@ export default function Jobs() {
                   ) : (
                     grouped[col.key].map(job => {
                       const d = new Date(job.created_at);
+                      // When the dropdown is "all", show the per-row kind so
+                      // unified and legacy rows are visually distinguishable.
+                      const chip = kindFilter === "all" ? job.kind : activeOption.chip;
                       return (
                         <Link
                           key={job.id}
@@ -101,9 +185,11 @@ export default function Jobs() {
                             {d.toLocaleTimeString()}
                           </div>
                           <div className="flex items-center gap-2 mt-2">
-                            <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded font-mono uppercase tracking-wide">
-                              innoculation
-                            </span>
+                            {chip && (
+                              <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded font-mono uppercase tracking-wide">
+                                {chip}
+                              </span>
+                            )}
                             {job.retry_count > 0 && (
                               <span className="text-[10px] text-yellow-500/80 flex items-center gap-1">
                                 <Activity className="w-3 h-3" /> #{job.retry_count}
@@ -121,8 +207,8 @@ export default function Jobs() {
         </div>
       ) : (
         <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
-          <CardContent className="p-12 text-center text-muted-foreground">
-            No innoculations found.
+          <CardContent className="p-12 text-center text-muted-foreground" data-testid="text-empty-jobs">
+            {activeOption.emptyText}
           </CardContent>
         </Card>
       )}
