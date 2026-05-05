@@ -570,7 +570,10 @@ export default function Splash() {
             strokeWidth="1"
           />
 
-          {/* Upper inner lens — top portal <-> upper node */}
+          {/* Upper inner lens — top portal <-> upper node. Solid base + a
+              traveling comet highlight so the inner lens reads as in motion
+              the same way the outer lens and innermost oval do. The two
+              sides run in opposite directions for visual interest. */}
           <path
             d="M 200 80 C 130 160, 130 280, 200 360"
             fill="none"
@@ -578,6 +581,17 @@ export default function Splash() {
             strokeOpacity="0.55"
             strokeWidth="1.2"
             className="animate-[innoculus-pulse-stroke_3.6s_ease-in-out_infinite]"
+          />
+          <path
+            d="M 200 80 C 130 160, 130 280, 200 360"
+            fill="none"
+            stroke="#ffffff"
+            strokeOpacity="0.85"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            pathLength={100}
+            className="animate-[innoculus-comet_6s_linear_infinite]"
+            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
           />
           <path
             d="M 200 80 C 270 160, 270 280, 200 360"
@@ -588,8 +602,21 @@ export default function Splash() {
             className="animate-[innoculus-pulse-stroke_3.6s_ease-in-out_infinite]"
             style={{ animationDelay: "0.4s" }}
           />
+          <path
+            d="M 200 80 C 270 160, 270 280, 200 360"
+            fill="none"
+            stroke="#ffffff"
+            strokeOpacity="0.85"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            pathLength={100}
+            className="animate-[innoculus-comet_6s_linear_infinite_reverse]"
+            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+          />
 
-          {/* Lower inner lens */}
+          {/* Lower inner lens — same comet highlight pass; directions
+              mirrored vs. the upper lens so the whole diagram reads as a
+              continuous flow up one side and down the other. */}
           <path
             d="M 200 360 C 130 440, 130 560, 200 640"
             fill="none"
@@ -600,6 +627,17 @@ export default function Splash() {
             style={{ animationDelay: "1s" }}
           />
           <path
+            d="M 200 360 C 130 440, 130 560, 200 640"
+            fill="none"
+            stroke="#ffffff"
+            strokeOpacity="0.85"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            pathLength={100}
+            className="animate-[innoculus-comet_6s_linear_infinite_reverse]"
+            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+          />
+          <path
             d="M 200 360 C 270 440, 270 560, 200 640"
             fill="none"
             stroke="#cfd4d9"
@@ -607,6 +645,17 @@ export default function Splash() {
             strokeWidth="1.2"
             className="animate-[innoculus-pulse-stroke_3.6s_ease-in-out_infinite]"
             style={{ animationDelay: "1.4s" }}
+          />
+          <path
+            d="M 200 360 C 270 440, 270 560, 200 640"
+            fill="none"
+            stroke="#ffffff"
+            strokeOpacity="0.85"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            pathLength={100}
+            className="animate-[innoculus-comet_6s_linear_infinite]"
+            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
           />
 
           {/* Innermost oval — solid base */}
