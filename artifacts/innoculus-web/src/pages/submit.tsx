@@ -186,7 +186,7 @@ export default function Submit() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Initiate Innoculants</h1>
-        <p className="text-muted-foreground mt-2 font-mono text-sm">Enqueue a new pipeline workload.</p>
+        <p className="text-muted-foreground mt-2 font-mono text-sm">Enqueue a new innoculum workload.</p>
       </div>
 
       <div className="bg-primary/10 border border-primary/20 p-3 rounded-md flex items-center gap-3">

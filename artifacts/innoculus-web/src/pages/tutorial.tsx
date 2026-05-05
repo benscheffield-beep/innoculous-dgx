@@ -54,7 +54,7 @@ export default function Tutorial() {
       {/* Pipeline */}
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle>The Pipeline</CardTitle>
+          <CardTitle>The Innoculum</CardTitle>
           <CardDescription>
             Every innoculant flows through four roles. Each role hands its output to the next.
           </CardDescription>
@@ -117,7 +117,7 @@ export default function Tutorial() {
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Innoculants</CardTitle>
-          <CardDescription>Two flavors of work the pipeline accepts.</CardDescription>
+          <CardDescription>Two flavors of work the innoculum accepts.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="p-4 rounded-md bg-black/30 border border-white/5">
@@ -194,7 +194,7 @@ export default function Tutorial() {
             and pick a tab — Numerical for a single evaluation, Cutoff Trace for a sweep.
             Fill the form and submit.
           </Step>
-          <Step num="2" title="Watch it move through the pipeline">
+          <Step num="2" title="Watch it move through the innoculum">
             The innoculant appears under{" "}
             <Link href="/jobs" className="text-primary hover:underline inline-flex items-center gap-1">
               <List className="w-3 h-3" /> All Innoculations

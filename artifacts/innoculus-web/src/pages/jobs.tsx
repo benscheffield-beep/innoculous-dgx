@@ -30,7 +30,7 @@ export default function Jobs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">All Innoculations</h1>
-          <p className="text-muted-foreground mt-2 font-mono text-sm">Historical pipeline execution records.</p>
+          <p className="text-muted-foreground mt-2 font-mono text-sm">Historical innoculum execution records.</p>
         </div>
       </div>
 

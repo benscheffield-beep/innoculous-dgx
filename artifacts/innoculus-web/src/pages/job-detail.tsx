@@ -230,7 +230,7 @@ export default function JobDetail() {
               <CardContent className="p-0">
                 {!isDev ? (
                   <div className="p-6">
-                    <p className="text-muted-foreground">Pipeline produced an artifact at version {artifact.version}.</p>
+                    <p className="text-muted-foreground">Innoculum produced an artifact at version {artifact.version}.</p>
                   </div>
                 ) : (
                   <Tabs defaultValue="raw" className="w-full">

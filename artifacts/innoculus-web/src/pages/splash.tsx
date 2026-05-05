@@ -50,7 +50,7 @@ export default function Splash() {
         <svg
           viewBox="0 0 400 720"
           className="w-[280px] sm:w-[340px] md:w-[400px] h-auto"
-          aria-label="Innoculus pipeline diagram. Tap the top node to enter."
+          aria-label="Innoculus innoculum diagram. Tap the top node to enter."
         >
           <defs>
             {/* White radial pulsation for the top portal node */}

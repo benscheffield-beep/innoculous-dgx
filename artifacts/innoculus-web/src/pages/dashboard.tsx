@@ -112,7 +112,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground">
-              No innoculants found in the pipeline.
+              No innoculants found in the innoculum.
             </div>
           )}
         </CardContent>
