@@ -75,11 +75,11 @@ React 19 + Vite 7 + TanStack Query app mounted at `/`. Calls the api-server at `
 
 - `/` **Splash** — fullscreen Goldstone-diagram entry portal (NO sidebar). Pure SVG with CSS `@keyframes` animations (`innoculus-flow`, `-pulse-stroke`, `-breathe`, `-core`, `-radiate`, `-blink` defined in `src/index.css`). Four agent nodes (Manager, Editor, Verifier, Artifact) inside a pulsing lens; ONLY the top Manager node is clickable (`data-testid="splash-enter"`) and navigates to `/dashboard`. Sidebar Innoculus wordmark on the dashboard shell returns to `/`.
 - `/dashboard` Dashboard — `useGetJobStats` + `useListJobs` for tiles and Recent Activity.
-- `/submit` Submit — react-hook-form + Zod, two tabs (Numerical / Cutoff Trace).
+- `/submit` Submit — react-hook-form + Zod. **Simplified single form** (Models / Latency / Probes). Spectral kernel, Q, truncation, precision, and all policy thresholds are filled in client-side from a fixed `SPECTRAL_DEFAULTS` constant in `submit.tsx` (matching the pre-simplification form defaults: gaussian σ=1.0, Q=`[[1,0]]`, M=32 r=16, b=53 tol=1e-6). **Q must stay fixed** — the editor's dual-index enumeration is exponential in `Q.length` (~67^d at M=32), so deriving Q from probe count would blow up the spectral pipeline. The form is identical in User and Developer modes.
 - `/jobs` All Jobs — paginated registry with filters.
 - `/jobs/:id` Detail — pipeline stepper, Verifier checks, artifact viewer, Retry button. `useGetJob` polls every 2.5s while status ∈ {queued, editor_running, verifying} and stops on terminal.
 
-Mode toggle: User vs Developer is a global React context (`src/lib/mode-context.tsx`), persisted to localStorage as `innoculus-mode`. User Mode hides truncation/latency/precision/policy fields and surfaces prose in diagnostics; Developer Mode reveals every metric including the Warburg trio (`closed_form_residual`, `mercer_slope`, `warburg_nu`).
+Mode toggle: User vs Developer is a global React context (`src/lib/mode-context.tsx`), persisted to localStorage as `innoculus-mode`. The submit form is identical in both modes (it no longer exposes spectral knobs at all). On `/jobs/:id`, User Mode surfaces prose in diagnostics; Developer Mode reveals every metric including the Warburg trio (`closed_form_residual`, `mercer_slope`, `warburg_nu`).
 
 Theme: dark only. Plus Jakarta Sans + Space Mono. **Important**: any `@import url(...)` (e.g. Google Fonts) MUST be the very first line of `src/index.css` — before `@import "tailwindcss"` — otherwise PostCSS silently drops it.
 

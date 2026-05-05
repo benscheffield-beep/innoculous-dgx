@@ -220,10 +220,12 @@ export default function Tutorial() {
           <Step num="1" title="Initiate">
             Go to{" "}
             <Link href="/submit" className="text-primary hover:underline inline-flex items-center gap-1">
-              <span className="inline-flex items-center justify-center w-3 h-3 text-xs leading-none font-serif">Θ</span> Initiate Innoculants
+              <span className="inline-flex items-center justify-center w-3 h-3 text-xs leading-none font-serif">Θ</span> Initiate Innoculation
             </Link>{" "}
-            and fill in both the Spectral and Speculative sections. A single submission
-            launches both phases.
+            and supply your probes (question, expected answer, date), the target and
+            judge models, and the latency profile. A single submission launches both
+            the Spectral and Speculative phases — kernel and tuning are sealed at
+            safe defaults.
           </Step>
           <Step num="2" title="Observe">
             The innoculation appears under{" "}
