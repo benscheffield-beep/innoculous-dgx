@@ -4,21 +4,41 @@ import { Link } from "wouter";
 import { ArrowRight, Brain, Edit3, ShieldCheck, FileBox, Play, List, BarChart3, Clock } from "lucide-react";
 import { InnoculusEmblem } from "@/components/innoculus-emblem";
 
+type MetalTint = "lead" | "copper" | "gold" | "silver";
+
+const METAL_PALETTE: Record<MetalTint, { color: string; bg: string; border: string; glow: string }> = {
+  lead:   { color: "#8a92a0", bg: "rgba(138,146,160,0.10)", border: "rgba(138,146,160,0.28)", glow: "rgba(138,146,160,0.35)" },
+  copper: { color: "#c87a3a", bg: "rgba(200,122,58,0.10)",  border: "rgba(200,122,58,0.32)",  glow: "rgba(200,122,58,0.40)"  },
+  gold:   { color: "#d4af37", bg: "rgba(212,175,55,0.10)",  border: "rgba(212,175,55,0.32)",  glow: "rgba(212,175,55,0.45)"  },
+  silver: { color: "#cfd3da", bg: "rgba(207,211,218,0.10)", border: "rgba(207,211,218,0.32)", glow: "rgba(207,211,218,0.40)" },
+};
+
 function PipelineNode({
   icon: Icon,
   name,
   role,
+  tint,
 }: {
   icon: any;
   name: string;
   role: string;
+  tint: MetalTint;
 }) {
+  const p = METAL_PALETTE[tint];
   return (
     <div className="flex flex-col items-center text-center gap-2 flex-1 min-w-0">
-      <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+      <div
+        className="w-12 h-12 rounded-full border flex items-center justify-center"
+        style={{
+          backgroundColor: p.bg,
+          borderColor: p.border,
+          color: p.color,
+          boxShadow: `0 0 18px -6px ${p.glow}`,
+        }}
+      >
         <Icon className="w-5 h-5" />
       </div>
-      <div className="font-semibold text-sm tracking-wide uppercase">{name}</div>
+      <div className="font-semibold text-sm tracking-wide uppercase" style={{ color: p.color }}>{name}</div>
       <div className="text-xs text-muted-foreground font-mono">{role}</div>
     </div>
   );
@@ -61,13 +81,13 @@ export default function Tutorial() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-2">
-            <PipelineNode icon={Brain} name="Reckoner" role="orchestrates" />
+            <PipelineNode icon={Brain} name="Reckoner" role="orchestrates" tint="lead" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={Edit3} name="Daemon" role="computes" />
+            <PipelineNode icon={Edit3} name="Daemon" role="computes" tint="copper" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={ShieldCheck} name="Judge" role="checks" />
+            <PipelineNode icon={ShieldCheck} name="Judge" role="checks" tint="gold" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={FileBox} name="Relic" role="emits" />
+            <PipelineNode icon={FileBox} name="Relic" role="emits" tint="silver" />
           </div>
 
           <div className="mt-8 grid gap-6 md:grid-cols-2">
