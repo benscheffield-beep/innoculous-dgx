@@ -156,20 +156,26 @@ export default function Splash() {
             style={{ animationDelay: "1.4s" }}
           />
 
-          {/* Crossing telemetry curves */}
+          {/* Crossing telemetry curves — innermost oval, marches opposite to outer lens */}
           <path
             d="M 200 220 C 145 290, 145 430, 200 500"
             fill="none"
-            stroke="#b6bbc1"
-            strokeOpacity="0.4"
-            strokeWidth="1"
+            stroke="url(#ic-stroke)"
+            strokeOpacity="0.6"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            className="animate-[innoculus-flow_8s_linear_infinite_reverse]"
+            style={{ strokeDasharray: "6 10" }}
           />
           <path
             d="M 200 220 C 255 290, 255 430, 200 500"
             fill="none"
-            stroke="#b6bbc1"
-            strokeOpacity="0.4"
-            strokeWidth="1"
+            stroke="url(#ic-stroke)"
+            strokeOpacity="0.6"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            className="animate-[innoculus-flow_8s_linear_infinite]"
+            style={{ strokeDasharray: "6 10" }}
           />
 
           {/* Interior nodes — silicon grey body, white halo */}
