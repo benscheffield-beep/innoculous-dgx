@@ -81,13 +81,13 @@ export default function Tutorial() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-2">
-            <PipelineNode icon={Brain} name="Reckoner" role="orchestrates" tint="lead" />
+            <PipelineNode icon={Brain} name="Reckoner" role="exploration" tint="lead" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={Edit3} name="Daemon" role="computes" tint="copper" />
+            <PipelineNode icon={Edit3} name="Daemon" role="computation" tint="copper" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={ShieldCheck} name="Judge" role="checks" tint="gold" />
+            <PipelineNode icon={ShieldCheck} name="Judge" role="validation" tint="gold" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={FileBox} name="Relic" role="emits" tint="silver" />
+            <PipelineNode icon={FileBox} name="Relic" role="preservation" tint="silver" />
           </div>
 
           <div className="mt-8 grid gap-6 md:grid-cols-2">
