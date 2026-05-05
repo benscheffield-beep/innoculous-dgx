@@ -160,7 +160,7 @@ export default function Tutorial() {
           </div>
           <div className="flex items-start gap-3">
             <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 mt-0.5">
-              Warn
+              Intermediate
             </Badge>
             <p className="text-sm text-muted-foreground leading-relaxed flex-1">
               The result is usable but one or more soft thresholds were crossed. Inspect
