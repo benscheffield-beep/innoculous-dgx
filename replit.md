@@ -67,6 +67,7 @@ POST /api/jobs/:id/work     — dispatch to Editor
 POST /api/jobs/:id/verify   — dispatch to Verifier
 POST /api/jobs/:id/verdict  — post Verifier verdict
 POST /api/jobs/:id/retry    — retry failed job
+POST /api/dev/daemon-test-relic — **dev-only** (mounted only when NODE_ENV ≠ production); inserts a synthetic sealed innoculation job + artifact in a single transaction and returns `{ jobId }`. Used by the sidebar's "Summon Daemon" button to exercise the DaemonChat (voice + orb) end-to-end without running the Spectral + Speculative pipeline.
 ```
 
 ## Frontend: `artifacts/innoculus-web`
@@ -78,6 +79,8 @@ React 19 + Vite 7 + TanStack Query app mounted at `/`. Calls the api-server at `
 - `/submit` Submit — react-hook-form + Zod. **Simplified single form** (Models / Latency / Probes). Spectral kernel, Q, truncation, precision, and all policy thresholds are filled in client-side from a fixed `SPECTRAL_DEFAULTS` constant in `submit.tsx` (matching the pre-simplification form defaults: gaussian σ=1.0, Q=`[[1,0]]`, M=32 r=16, b=53 tol=1e-6). **Q must stay fixed** — the editor's dual-index enumeration is exponential in `Q.length` (~67^d at M=32), so deriving Q from probe count would blow up the spectral pipeline. The form is identical in User and Developer modes.
 - `/jobs` All Jobs — paginated registry with filters.
 - `/jobs/:id` Detail — pipeline stepper, Verifier checks, artifact viewer, Retry button. `useGetJob` polls every 2.5s while status ∈ {queued, editor_running, verifying} and stops on terminal. Daemon chat panel (`components/daemon-chat.tsx`) appears once the relic is sealed; it embeds the **DaemonOrb** (`components/daemon-orb.tsx`) which pulses on every assistant response. The chat plays the daemon voice (`public/audio/daemon-{female,male}.mp3`, the same clip used on the splash) through a Web Audio AnalyserNode via the `useDaemonVoice` hook (`lib/use-daemon-voice.ts`). The orb's halo + core radius track the AnalyserNode's RMS amplitude every animation frame. **Browser autoplay note**: `voice.prime()` MUST be called inside the send-button click handler so the AudioContext is created/resumed in a user gesture; `voice.play()` is then safe to call later from the async `onSuccess` callback.
+
+The sidebar exposes a **"Summon Daemon"** button (`SummonDaemonButton` in `components/layout.tsx`, dev-only) that POSTs to `/api/dev/daemon-test-relic` and navigates to `/jobs/{jobId}` so the Daemon (voice + orb) can be tested in seconds without running the Spectral + Speculative pipeline.
 
 Mode toggle: User vs Developer is a global React context (`src/lib/mode-context.tsx`), persisted to localStorage as `innoculus-mode`. The submit form is identical in both modes (it no longer exposes spectral knobs at all). On `/jobs/:id`, User Mode surfaces prose in diagnostics; Developer Mode reveals every metric including the Warburg trio (`closed_form_residual`, `mercer_slope`, `warburg_nu`).
 

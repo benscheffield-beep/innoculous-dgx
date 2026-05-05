@@ -1,11 +1,13 @@
 import type React from "react";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMode } from "@/lib/mode-context";
 import { useHealthCheck, getHealthCheckQueryKey } from "@workspace/api-client-react";
-import { Settings } from "lucide-react";
+import { Settings, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { InnoculusEmblem } from "@/components/innoculus-emblem";
+import { useToast } from "@/hooks/use-toast";
 
 function HealthIndicator() {
   const { data, isError } = useHealthCheck({
@@ -24,6 +26,70 @@ function HealthIndicator() {
         {isHealthy ? 'SYS OK' : 'SYS ERR'}
       </span>
     </div>
+  );
+}
+
+/** Bypass the Spectral + Speculative pipeline by minting a synthetic sealed
+ *  relic on the server, then jump to its job-detail page where the real
+ *  DaemonChat (with voice + orb pulse) is mounted. Lets us exercise the
+ *  daemon end-to-end without waiting on a real innoculation run. */
+function SummonDaemonButton() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [pending, setPending] = useState(false);
+  const onClick = async () => {
+    if (pending) return;
+    setPending(true);
+    try {
+      // Match the generated API client's URL convention: an absolute `/api`
+      // root, not BASE_URL-prefixed. The api-server is mounted at the
+      // shared `/api` path in this monorepo regardless of the web artifact's
+      // base path, so this stays consistent across deployments.
+      const resp = await fetch("/api/dev/daemon-test-relic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!resp.ok) {
+        let detail = `HTTP ${resp.status}`;
+        try {
+          const body = (await resp.json()) as { message?: string; error?: string };
+          if (body.message) detail = body.message;
+          else if (body.error) detail = body.error;
+        } catch {
+          // Response wasn't JSON; keep the HTTP status as the detail.
+        }
+        throw new Error(detail);
+      }
+      const data = (await resp.json()) as { jobId?: string };
+      if (!data.jobId) throw new Error("response missing jobId");
+      navigate(`/jobs/${data.jobId}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast({
+        title: "Could not summon Daemon",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      data-testid="link-nav-summon-daemon"
+      className="flex items-center gap-3 px-4 py-3 rounded-md transition-colors text-muted-foreground hover:bg-white/5 hover:text-foreground disabled:opacity-60 disabled:cursor-wait text-left"
+    >
+      <span className="w-4 h-4 inline-flex items-center justify-center text-base leading-none font-serif">
+        {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "∂"}
+      </span>
+      <span className="font-medium text-sm">
+        {pending ? "Summoning…" : "Summon Daemon"}
+      </span>
+    </button>
   );
 }
 
@@ -62,6 +128,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="w-4 h-4 inline-flex items-center justify-center text-base leading-none font-serif">י</span>
             <span className="font-medium text-sm">Tutorial</span>
           </Link>
+          <SummonDaemonButton />
         </nav>
 
         <div className="p-6 border-t border-border mt-auto flex flex-col gap-6">
