@@ -901,7 +901,7 @@ export default function Splash() {
             onClick={closeDaemonChat}
             aria-label="Close Daemon chat"
             data-testid="button-daemon-close"
-            className="absolute top-3 right-3 text-white/30 hover:text-white/80 transition-colors p-1 rounded-full"
+            className="absolute top-3 right-3 text-foreground/30 hover:text-foreground/80 transition-colors p-1 rounded-full"
           >
             <X className="w-3 h-3" strokeWidth={1.5} />
           </button>
@@ -914,13 +914,13 @@ export default function Splash() {
             data-speaking={orbSpeaking ? "true" : "false"}
           >
             <div
-              className="text-[15px] leading-[1.65] text-white/90 whitespace-pre-wrap min-h-[1.65em] font-light tracking-[0.005em] pr-6"
+              className="text-[15px] leading-[1.65] text-foreground/90 whitespace-pre-wrap min-h-[1.65em] font-light tracking-[0.005em] pr-6"
               data-testid="daemon-transcript"
               aria-live="polite"
               aria-atomic="true"
             >
               {chatPending && !transcript ? (
-                <span className="inline-flex items-center gap-2.5 text-white/50 italic">
+                <span className="inline-flex items-center gap-2.5 text-foreground/50 italic">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
                   The Daemon is gathering itself…
                 </span>
@@ -955,7 +955,7 @@ export default function Splash() {
               placeholder="Ask the Daemon…"
               disabled={chatPending}
               data-testid="input-splash-daemon-message"
-              className="flex-1 min-h-[40px] max-h-[120px] resize-none bg-transparent border-0 px-0 py-2.5 text-[14px] leading-snug text-white/90 placeholder:text-white/30 placeholder:font-light focus:outline-none focus:ring-0 disabled:opacity-50 font-light tracking-[0.005em]"
+              className="flex-1 min-h-[40px] max-h-[120px] resize-none bg-transparent border-0 px-0 py-2.5 text-[14px] leading-snug text-foreground/90 placeholder:text-foreground/30 placeholder:font-light focus:outline-none focus:ring-0 disabled:opacity-50 font-light tracking-[0.005em]"
               rows={1}
             />
             <button
@@ -963,7 +963,7 @@ export default function Splash() {
               onClick={submitChatInput}
               disabled={!chatInput.trim() || chatPending}
               data-testid="button-splash-daemon-send"
-              className="shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/[0.06] active:bg-white/[0.10] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white/50"
+              className="shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-full text-foreground/50 hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.10] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground/50"
               aria-label="Send to Daemon"
             >
               {chatPending ? (

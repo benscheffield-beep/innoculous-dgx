@@ -2,7 +2,7 @@ import { useGetJobStats, getGetJobStatsQueryKey, useListJobs, getListJobsQueryKe
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { ArrowRight, Activity, CheckCircle2, FileBox } from "lucide-react";
+import { ArrowRight, Activity, CheckCircle2, Gem } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 function StatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: any, description?: string }) {
@@ -72,7 +72,7 @@ export default function Dashboard() {
           <StatCard
             title="Innoculation Relics"
             value={stats.by_kind?.innoculation || 0}
-            icon={FileBox}
+            icon={Gem}
             description="Unified Spectral + Speculative"
           />
         </div>

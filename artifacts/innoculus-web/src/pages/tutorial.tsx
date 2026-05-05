@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Link } from "wouter";
-import { ArrowRight, Brain, Edit3, ShieldCheck, FileBox, BarChart3, Clock } from "lucide-react";
+import { ArrowRight, Eye, Flame, Scale, Gem, BarChart3, Clock } from "lucide-react";
 import { InnoculusEmblem } from "@/components/innoculus-emblem";
 
 type MetalTint = "lead" | "copper" | "gold" | "silver";
@@ -77,13 +77,13 @@ export default function Tutorial() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-2">
-            <PipelineNode icon={Brain} name="Reckoner" role="exploration" tint="lead" />
+            <PipelineNode icon={Eye} name="Reckoner" role="exploration" tint="lead" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={Edit3} name="Daemon" role="computation" tint="copper" />
+            <PipelineNode icon={Flame} name="Daemon" role="computation" tint="copper" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={ShieldCheck} name="Judge" role="validation" tint="gold" />
+            <PipelineNode icon={Scale} name="Judge" role="validation" tint="gold" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={FileBox} name="Relic" role="preservation" tint="silver" />
+            <PipelineNode icon={Gem} name="Relic" role="preservation" tint="silver" />
           </div>
 
           <div className="mt-8 grid gap-6 md:grid-cols-2">
@@ -161,7 +161,7 @@ export default function Tutorial() {
           </div>
           <div className="md:col-span-2 p-4 rounded-md bg-primary/5 border border-primary/20">
             <div className="flex items-center gap-2 mb-2">
-              <Brain className="w-4 h-4 text-primary" />
+              <Flame className="w-4 h-4 text-primary" />
               <h4 className="font-semibold text-sm uppercase tracking-wide text-primary">Daemon chat</h4>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
