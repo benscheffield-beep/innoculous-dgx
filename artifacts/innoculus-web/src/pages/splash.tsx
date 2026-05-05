@@ -358,54 +358,19 @@ export default function Splash() {
     const pos = ROLE_ORB_POS.daemon;
     setPulse({ key: "daemon", id: pulseIdRef.current, cx: pos.cx, cy: pos.cy });
     if (!chatOpen) setChatOpen(true);
-    // First open of the session: ask the unbound Daemon to greet the user.
+    // First open of the session: seed the chat with a fixed greeting line.
+    // We deliberately do NOT call the LLM for this — the user wants the
+    // exact wording every time, so we hardcode it as the first assistant
+    // turn (and write it into chatHistory so the LLM picks it up as
+    // conversational context for any follow-up turns the visitor sends).
     if (!greetedRef.current) {
       greetedRef.current = true;
-      const seed: ChatMsg[] = [
-        {
-          role: "user",
-          content:
-            "I have just opened the Innoculus splash portal. Greet me as the unbound Daemon in two short sentences and invite me to ask a question.",
-        },
-      ];
-      // The seed is internal — don't surface it in the visible history.
-      setChatPending(true);
-      setChatError(null);
-      void (async () => {
-        try {
-          const resp = await fetch("/api/daemon/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages: seed }),
-          });
-          if (!resp.ok) {
-            let detail = `HTTP ${resp.status}`;
-            try {
-              const body = (await resp.json()) as { message?: string; error?: string };
-              if (body.message) detail = body.message;
-              else if (body.error) detail = body.error;
-            } catch {
-              /* keep status */
-            }
-            throw new Error(detail);
-          }
-          const data = (await resp.json()) as { content?: string };
-          const content = (data.content ?? "").trim();
-          if (!content) throw new Error("empty Daemon response");
-          setChatHistory([{ role: "assistant", content }]);
-          setTranscript(content);
-          performSpeak("daemon");
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
-          setChatError(message);
-          // Allow retry on next open.
-          greetedRef.current = false;
-        } finally {
-          setChatPending(false);
-        }
-      })();
+      const greeting =
+        "Ask in accordance with the relics of AI. Open from the orb above to create your relics.";
+      setChatHistory([{ role: "assistant", content: greeting }]);
+      setTranscript(greeting);
     }
-  }, [chatOpen, speak, performSpeak]);
+  }, [chatOpen, speak]);
 
   const closeDaemonChat = useCallback(() => {
     setChatOpen(false);
