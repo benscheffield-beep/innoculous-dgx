@@ -2,7 +2,7 @@ import type React from "react";
 import { Link, useLocation } from "wouter";
 import { useMode } from "@/lib/mode-context";
 import { useHealthCheck, getHealthCheckQueryKey } from "@workspace/api-client-react";
-import { LayoutDashboard, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { InnoculusEmblem } from "@/components/innoculus-emblem";
@@ -47,7 +47,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 p-4 flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-visible">
           <Link href="/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${location === "/dashboard" ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"}`} data-testid="link-nav-dashboard">
-            <LayoutDashboard className="w-4 h-4" />
+            <span className="w-4 h-4 inline-flex items-center justify-center text-base leading-none font-serif">א</span>
             <span className="font-medium text-sm">Dashboard</span>
           </Link>
           <Link href="/submit" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${location === "/submit" ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"}`} data-testid="link-nav-submit">
