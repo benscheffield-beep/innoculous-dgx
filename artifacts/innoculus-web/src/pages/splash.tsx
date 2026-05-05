@@ -1,71 +1,71 @@
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
- * Speak the wordmark "Innoculus" using two voices (one female-leaning, one male-leaning)
- * via the browser's built-in SpeechSynthesis API. Voices are queued back-to-back so the
- * pair is heard as a quick duet. Falls back to pitch-only differentiation if no
- * recognizable gendered voices are available. Speech persists across the SPA navigation.
+ * Pre-rendered "Innoculus" voice clips (female + male) decoded once into AudioBuffers
+ * so we can fire both through the Web Audio API on the same audio frame. This is
+ * sample-accurate, unlike two parallel HTMLAudioElement.play() calls which can
+ * drift by tens of milliseconds at the JS layer. Clips are pre-trimmed to remove
+ * leading/trailing silence, so the words start in lockstep.
  */
-function speakInnoculus() {
-  if (typeof window === "undefined") return;
-  const synth = window.speechSynthesis;
-  if (!synth) return;
+type LoadedVoices = {
+  ctx: AudioContext;
+  female: AudioBuffer;
+  male: AudioBuffer;
+};
 
-  const start = () => {
-    const voices = synth.getVoices();
-
-    const femaleHints = ["female", "woman", "samantha", "victoria", "karen", "zira", "susan", "tessa", "moira", "fiona", "allison", "ava", "serena"];
-    const maleHints = ["male", "man", "daniel", "alex", "fred", "david", "tom", "george", "oliver", "rishi", "arthur", "diego"];
-
-    const pickVoice = (hints: string[]): SpeechSynthesisVoice | undefined => {
-      const enVoices = voices.filter((v) => v.lang?.toLowerCase().startsWith("en"));
-      const pool = enVoices.length ? enVoices : voices;
-      return pool.find((v) => hints.some((h) => v.name.toLowerCase().includes(h)));
-    };
-
-    const femaleVoice = pickVoice(femaleHints);
-    const maleVoice = pickVoice(maleHints);
-
-    synth.cancel();
-
-    const word = "Innoculus";
-
-    const fem = new SpeechSynthesisUtterance(word);
-    if (femaleVoice) fem.voice = femaleVoice;
-    fem.pitch = femaleVoice ? 1.1 : 1.55;
-    fem.rate = 0.95;
-    fem.volume = 1;
-
-    const mas = new SpeechSynthesisUtterance(word);
-    if (maleVoice) mas.voice = maleVoice;
-    mas.pitch = maleVoice ? 0.95 : 0.55;
-    mas.rate = 0.95;
-    mas.volume = 1;
-
-    synth.speak(fem);
-    synth.speak(mas);
-  };
-
-  // Voices may load asynchronously on first use; wait once if needed.
-  if (synth.getVoices().length === 0) {
-    const handler = () => {
-      synth.removeEventListener("voiceschanged", handler);
-      start();
-    };
-    synth.addEventListener("voiceschanged", handler);
-    // Trigger voice loading in some browsers
-    synth.getVoices();
-    // Fallback: if voiceschanged never fires, attempt after a short delay
-    setTimeout(() => {
-      if (synth.getVoices().length > 0) {
-        synth.removeEventListener("voiceschanged", handler);
-        start();
-      }
-    }, 250);
-  } else {
-    start();
+async function loadVoices(): Promise<LoadedVoices | null> {
+  if (typeof window === "undefined") return null;
+  const Ctx: typeof AudioContext | undefined =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctx) return null;
+  const base = import.meta.env.BASE_URL ?? "/";
+  let ctx: AudioContext | null = null;
+  try {
+    ctx = new Ctx();
+    const [femResp, masResp] = await Promise.all([
+      fetch(`${base}audio/innoculus-female.mp3`),
+      fetch(`${base}audio/innoculus-male.mp3`),
+    ]);
+    if (!femResp.ok || !masResp.ok) {
+      void ctx.close();
+      return null;
+    }
+    const [femBuf, masBuf] = await Promise.all([
+      femResp.arrayBuffer(),
+      masResp.arrayBuffer(),
+    ]);
+    const [female, male] = await Promise.all([
+      ctx.decodeAudioData(femBuf),
+      ctx.decodeAudioData(masBuf),
+    ]);
+    return { ctx, female, male };
+  } catch {
+    if (ctx) void ctx.close();
+    return null;
   }
+}
+
+function speakInnoculus(voices: LoadedVoices | null) {
+  if (!voices) return;
+  const { ctx, female, male } = voices;
+  if (ctx.state === "suspended") void ctx.resume();
+  // Stretch the shorter clip so both finish at the same instant.
+  const target = Math.max(female.duration, male.duration);
+  const playOne = (buf: AudioBuffer, gain: number) => {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = buf.duration / target;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(ctx.destination);
+    return src;
+  };
+  // Schedule both starts at the exact same audio time — sample-accurate sync.
+  const startAt = ctx.currentTime + 0.02;
+  playOne(female, 0.85).start(startAt);
+  playOne(male, 0.85).start(startAt);
 }
 
 export default function Splash() {
@@ -74,8 +74,30 @@ export default function Splash() {
 
   const [hoverTutorial, setHoverTutorial] = useState(false);
 
+  const voicesRef = useRef<LoadedVoices | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadVoices().then((v) => {
+      if (!v) return;
+      // If the splash unmounted before decode finished, the user can't have
+      // clicked the orb yet, so the context is unused — close it to avoid
+      // accumulating contexts on repeated mounts (Safari has a low limit).
+      if (cancelled) {
+        void v.ctx.close();
+        return;
+      }
+      voicesRef.current = v;
+    });
+    // Once playback has started (handleEnter → navigate), Splash unmounts
+    // immediately. We deliberately leave that already-playing context open
+    // so the audio finishes — the browser reclaims it on page unload.
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleEnter = () => {
-    speakInnoculus();
+    speakInnoculus(voicesRef.current);
     navigate("/dashboard");
   };
   const handleTutorial = () => navigate("/tutorial");
