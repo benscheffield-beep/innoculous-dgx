@@ -98,10 +98,7 @@ export default function Dashboard() {
                 <Link key={job.id} href={`/jobs/${job.id}`} className="flex items-center justify-between py-4 hover:bg-white/5 px-2 -mx-2 rounded-md transition-colors group cursor-pointer">
                   <div className="flex items-center gap-4">
                     <StatusBadge status={job.status} />
-                    <div>
-                      <div className="font-mono text-sm font-medium text-foreground">{job.id.split('-')[0]}</div>
-                      <div className="text-xs text-muted-foreground mt-1 font-mono uppercase tracking-wide">innoculation</div>
-                    </div>
+                    <div className="text-xs text-muted-foreground font-mono uppercase tracking-wide">innoculation</div>
                   </div>
                   <div className="flex items-center gap-4 text-right">
                     <div className="text-xs text-muted-foreground font-mono">
