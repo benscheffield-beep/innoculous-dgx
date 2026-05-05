@@ -206,7 +206,7 @@ export default function Tutorial() {
           <CardDescription>Run your first innoculant in three steps.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Step num="1" title="Initiate an innoculant">
+          <Step num="1" title="Initiate">
             Go to{" "}
             <Link href="/submit" className="text-primary hover:underline inline-flex items-center gap-1">
               <Play className="w-3 h-3" /> Initiate Innoculants
@@ -214,7 +214,7 @@ export default function Tutorial() {
             and pick a tab — Spectral for a single evaluation, Speculative for a sweep.
             Fill the form and submit.
           </Step>
-          <Step num="2" title="Watch it move through the innoculum">
+          <Step num="2" title="Observe">
             The innoculant appears under{" "}
             <Link href="/jobs" className="text-primary hover:underline inline-flex items-center gap-1">
               <List className="w-3 h-3" /> All Innoculations
@@ -222,7 +222,7 @@ export default function Tutorial() {
             . Click any row to see its live status — Queued, Daemon Running, Judging,
             then a final verdict.
           </Step>
-          <Step num="3" title="Read the diagnostics">
+          <Step num="3" title="Retrieve">
             On the innoculant detail page you get the verdict, the relic payload, and the full
             diagnostic table. Toggle <span className="font-mono text-foreground">Operator Mode</span>{" "}
             in the sidebar to reveal advanced metrics like the Warburg trio, truncation
