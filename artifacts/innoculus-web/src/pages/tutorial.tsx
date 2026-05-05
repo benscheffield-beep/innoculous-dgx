@@ -75,9 +75,6 @@ export default function Tutorial() {
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>The Innoculum</CardTitle>
-          <CardDescription>
-            Every innoculant flows through four roles. Each role hands its output to the next.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-2">
