@@ -976,6 +976,38 @@ export const ChatWithDaemonResponse = zod.object({
 });
 
 /**
+ * The "unbound" Daemon — a Daemon persona that is NOT conditioned on any
+specific relic. Used by the splash widget so visitors can converse with
+the Daemon directly (with voice playback) before initiating any
+innoculation. Stateless: clients send the full message history every
+call; nothing is persisted server-side.
+
+ * @summary Send a chat turn to the unbound Daemon
+ */
+
+export const ChatWithStandaloneDaemonBody = zod.object({
+  messages: zod
+    .array(
+      zod.object({
+        role: zod.enum(["user", "assistant"]),
+        content: zod.string(),
+      }),
+    )
+    .min(1),
+  model: zod
+    .string()
+    .optional()
+    .describe(
+      "Optional override of the Daemon model. Defaults to the server's configured model.",
+    ),
+});
+
+export const ChatWithStandaloneDaemonResponse = zod.object({
+  content: zod.string(),
+  model: zod.string(),
+});
+
+/**
  * Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards. When `kind` is supplied, `total`, `by_status`, `by_verdict`, and `recent_24h` are scoped to that kind; `by_kind` always reports global counts.
  * @summary Job stats summary
  */

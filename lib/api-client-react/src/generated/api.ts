@@ -996,6 +996,98 @@ export const useChatWithDaemon = <
 };
 
 /**
+ * The "unbound" Daemon — a Daemon persona that is NOT conditioned on any
+specific relic. Used by the splash widget so visitors can converse with
+the Daemon directly (with voice playback) before initiating any
+innoculation. Stateless: clients send the full message history every
+call; nothing is persisted server-side.
+
+ * @summary Send a chat turn to the unbound Daemon
+ */
+export const getChatWithStandaloneDaemonUrl = () => {
+  return `/api/daemon/messages`;
+};
+
+export const chatWithStandaloneDaemon = async (
+  daemonChatRequest: DaemonChatRequest,
+  options?: RequestInit,
+): Promise<DaemonChatResponse> => {
+  return customFetch<DaemonChatResponse>(getChatWithStandaloneDaemonUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(daemonChatRequest),
+  });
+};
+
+export const getChatWithStandaloneDaemonMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof chatWithStandaloneDaemon>>,
+    TError,
+    { data: BodyType<DaemonChatRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof chatWithStandaloneDaemon>>,
+  TError,
+  { data: BodyType<DaemonChatRequest> },
+  TContext
+> => {
+  const mutationKey = ["chatWithStandaloneDaemon"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof chatWithStandaloneDaemon>>,
+    { data: BodyType<DaemonChatRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return chatWithStandaloneDaemon(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ChatWithStandaloneDaemonMutationResult = NonNullable<
+  Awaited<ReturnType<typeof chatWithStandaloneDaemon>>
+>;
+export type ChatWithStandaloneDaemonMutationBody = BodyType<DaemonChatRequest>;
+export type ChatWithStandaloneDaemonMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Send a chat turn to the unbound Daemon
+ */
+export const useChatWithStandaloneDaemon = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof chatWithStandaloneDaemon>>,
+    TError,
+    { data: BodyType<DaemonChatRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof chatWithStandaloneDaemon>>,
+  TError,
+  { data: BodyType<DaemonChatRequest> },
+  TContext
+> => {
+  return useMutation(getChatWithStandaloneDaemonMutationOptions(options));
+};
+
+/**
  * Returns counts of jobs grouped by status and kind, plus recent verdict breakdown. Useful for dashboards. When `kind` is supplied, `total`, `by_status`, `by_verdict`, and `recent_24h` are scoped to that kind; `by_kind` always reports global counts.
  * @summary Job stats summary
  */

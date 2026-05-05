@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Send, X } from "lucide-react";
 
 /**
  * Pre-rendered voice clips (female + male) for each phrase, decoded once into
@@ -19,21 +20,25 @@ const PHRASE_FILES: Record<PhraseKey, { female: string; male: string }> = {
 };
 
 type VoicePair = { female: AudioBuffer; male: AudioBuffer };
-type LoadedVoices = {
-  ctx: AudioContext;
+type LevelListener = (level: number) => void;
+
+/** Async-decoded buffers + per-context analyser. Created once per AudioContext. */
+type LoadedBuffers = {
   phrases: Record<PhraseKey, VoicePair>;
+  analyser: AnalyserNode;
 };
 
-async function loadVoices(): Promise<LoadedVoices | null> {
-  if (typeof window === "undefined") return null;
-  const Ctx: typeof AudioContext | undefined =
+function getAudioContextCtor(): typeof AudioContext | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (
     window.AudioContext ??
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctx) return null;
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  );
+}
+
+async function loadBuffers(ctx: AudioContext): Promise<LoadedBuffers | null> {
   const base = import.meta.env.BASE_URL ?? "/";
-  let ctx: AudioContext | null = null;
   try {
-    ctx = new Ctx();
     const keys = Object.keys(PHRASE_FILES) as PhraseKey[];
     const decoded = await Promise.all(
       keys.map(async (key): Promise<[PhraseKey, VoicePair]> => {
@@ -50,41 +55,21 @@ async function loadVoices(): Promise<LoadedVoices | null> {
           masResp.arrayBuffer(),
         ]);
         const [female, male] = await Promise.all([
-          ctx!.decodeAudioData(femBuf),
-          ctx!.decodeAudioData(masBuf),
+          ctx.decodeAudioData(femBuf),
+          ctx.decodeAudioData(masBuf),
         ]);
         return [key, { female, male }];
       }),
     );
     const phrases = Object.fromEntries(decoded) as Record<PhraseKey, VoicePair>;
-    return { ctx, phrases };
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.7;
+    analyser.connect(ctx.destination);
+    return { phrases, analyser };
   } catch {
-    if (ctx) void ctx.close();
     return null;
   }
-}
-
-function speak(voices: LoadedVoices | null, key: PhraseKey) {
-  if (!voices) return;
-  const { ctx, phrases } = voices;
-  const pair = phrases[key];
-  if (!pair) return;
-  if (ctx.state === "suspended") void ctx.resume();
-  // Stretch the shorter clip so both finish at the same instant.
-  const target = Math.max(pair.female.duration, pair.male.duration);
-  const playOne = (buf: AudioBuffer, gain: number) => {
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.playbackRate.value = buf.duration / target;
-    const g = ctx.createGain();
-    g.gain.value = gain;
-    src.connect(g).connect(ctx.destination);
-    return src;
-  };
-  // Schedule both starts at the exact same audio time — sample-accurate sync.
-  const startAt = ctx.currentTime + 0.02;
-  playOne(pair.female, 0.85).start(startAt);
-  playOne(pair.male, 0.85).start(startAt);
 }
 
 type HoverKey = PhraseKey | "tutorial";
@@ -102,57 +87,378 @@ const ROLE_ORB_POS: Record<"reckoner" | "daemon" | "judge", { cx: number; cy: nu
   judge:    { cx: 200, cy: 500 },
 };
 
+type ChatMsg = { role: "user" | "assistant"; content: string };
+
 export default function Splash() {
   const [, navigate] = useLocation();
   const [hovered, setHovered] = useState<HoverKey | null>(null);
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const pulseIdRef = useRef(0);
 
-  const voicesRef = useRef<LoadedVoices | null>(null);
+  // ─── Daemon chat overlay state ────────────────────────────────────────────
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatHistory, setChatHistory] = useState<ChatMsg[]>([]);
+  const [transcript, setTranscript] = useState<string>("");
+  const [chatInput, setChatInput] = useState("");
+  const [chatPending, setChatPending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const greetedRef = useRef(false);
+  const inputElRef = useRef<HTMLTextAreaElement>(null);
+
+  // Refs onto the Daemon SVG circles so we can drive the radii imperatively
+  // from the audio amplitude meter. Avoids re-rendering the diagram per
+  // animation frame.
+  const daemonHaloRef = useRef<SVGCircleElement>(null);
+  const daemonCoreRef = useRef<SVGCircleElement>(null);
+  const [orbSpeaking, setOrbSpeaking] = useState(false);
+
+  // ─── Audio infrastructure ─────────────────────────────────────────────────
+  // The AudioContext is created **synchronously inside a user-gesture handler**
+  // (see primeAudio()) so the browser autoplay policy unlocks it. Buffer
+  // decode happens asynchronously after that. A play call before buffers are
+  // ready is queued as a single pending key.
+  const ctxRef = useRef<AudioContext | null>(null);
+  const buffersRef = useRef<LoadedBuffers | null>(null);
+  const loadingRef = useRef<Promise<LoadedBuffers | null> | null>(null);
+  const pendingPlayRef = useRef<PhraseKey | null>(null);
+  const listenersRef = useRef<Set<LevelListener>>(new Set());
+  const meterRunningRef = useRef(false);
+  const speakingFlagRef = useRef(false);
+  const stopTimeoutRef = useRef<number | null>(null);
+  const cancelledRef = useRef(false);
+
+  // Cleanup on unmount: cancel timers, clear listeners, close the context if
+  // it was ever created. cancelledRef gates any in-flight load promise from
+  // installing buffers post-unmount.
   useEffect(() => {
-    let cancelled = false;
-    void loadVoices().then((v) => {
-      if (!v) return;
-      // If the splash unmounted before decode finished, the user can't have
-      // clicked the orb yet, so the context is unused — close it to avoid
-      // accumulating contexts on repeated mounts (Safari has a low limit).
-      if (cancelled) {
-        void v.ctx.close();
-        return;
-      }
-      voicesRef.current = v;
-    });
-    // Once playback has started (handleEnter → navigate), Splash unmounts
-    // immediately. We deliberately leave that already-playing context open
-    // so the audio finishes — the browser reclaims it on page unload.
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
+      if (stopTimeoutRef.current != null) {
+        window.clearTimeout(stopTimeoutRef.current);
+        stopTimeoutRef.current = null;
+      }
+      listenersRef.current.clear();
+      const ctx = ctxRef.current;
+      if (ctx) void ctx.close();
+      ctxRef.current = null;
+      buffersRef.current = null;
     };
   }, []);
 
+  /** Install a per-frame amplitude listener. Returns an unsubscribe fn that
+   *  removes only this listener (architectural fix vs. clearing the whole Set). */
+  const subscribeLevel = useCallback((cb: LevelListener): (() => void) => {
+    listenersRef.current.add(cb);
+    return () => {
+      listenersRef.current.delete(cb);
+    };
+  }, []);
+
+  // Wire the Daemon SVG orb to the amplitude meter — once, at mount, since
+  // the listener Set is stable. The cleanup correctly removes only our cb.
+  useEffect(() => {
+    const cb: LevelListener = (level) => {
+      const halo = daemonHaloRef.current;
+      const core = daemonCoreRef.current;
+      // Idle baseline matches the static design (halo r=26, core r=7).
+      // Peak amplitude bloats halo to ~46 / core to ~13.
+      const haloR = 26 + level * 20;
+      const coreR = 7 + level * 6;
+      const haloOpacity = 0.55 + level * 0.45;
+      if (halo) {
+        halo.setAttribute("r", String(haloR));
+        halo.setAttribute("opacity", String(haloOpacity));
+      }
+      if (core) {
+        core.setAttribute("r", String(coreR));
+      }
+      // `orbSpeaking` toggles CSS animation off/on; only fires twice per clip
+      // so per-frame state churn is avoided.
+      const speaking = level > 0.01 || speakingFlagRef.current;
+      setOrbSpeaking((prev) => (prev === speaking ? prev : speaking));
+    };
+    return subscribeLevel(cb);
+  }, [subscribeLevel]);
+
+  /** Synchronously create + resume the AudioContext inside a user gesture so
+   *  the browser autoplay policy unlocks it for later async play. Idempotent. */
+  const primeAudio = useCallback(() => {
+    if (!ctxRef.current) {
+      const Ctx = getAudioContextCtor();
+      if (!Ctx) return;
+      try {
+        ctxRef.current = new Ctx();
+      } catch {
+        return;
+      }
+    }
+    const ctx = ctxRef.current;
+    if (ctx.state === "suspended") void ctx.resume();
+    if (!loadingRef.current) {
+      loadingRef.current = loadBuffers(ctx).then((b) => {
+        if (cancelledRef.current) return null;
+        if (b) {
+          buffersRef.current = b;
+          // Drain a queued playback if one was requested while loading.
+          const pending = pendingPlayRef.current;
+          if (pending) {
+            pendingPlayRef.current = null;
+            performSpeak(pending);
+          }
+        } else {
+          // Allow a future prime to retry on transient fetch/decode failure.
+          loadingRef.current = null;
+        }
+        return b;
+      });
+    }
+  }, []);
+
+  /** Run the rAF-driven RMS meter once; self-terminates when silence settles. */
+  const startMeter = useCallback(() => {
+    if (meterRunningRef.current) return;
+    const buffers = buffersRef.current;
+    if (!buffers) return;
+    meterRunningRef.current = true;
+    const analyser = buffers.analyser;
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    const tick = () => {
+      if (cancelledRef.current) {
+        meterRunningRef.current = false;
+        return;
+      }
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i]! - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      const level = Math.min(1, rms * 2.6);
+      listenersRef.current.forEach((cb) => cb(level));
+      if (speakingFlagRef.current || level > 0.02) {
+        requestAnimationFrame(tick);
+      } else {
+        meterRunningRef.current = false;
+        listenersRef.current.forEach((cb) => cb(0));
+      }
+    };
+    requestAnimationFrame(tick);
+  }, []);
+
+  /** Schedule a phrase pair through the analyser. If buffers aren't ready
+   *  yet, queue a single playback for when they arrive. */
+  const performSpeak = useCallback(
+    (key: PhraseKey) => {
+      const ctx = ctxRef.current;
+      const buffers = buffersRef.current;
+      if (!ctx || !buffers) {
+        // Buffers still loading — queue a single playback for arrival.
+        pendingPlayRef.current = key;
+        return;
+      }
+      const pair = buffers.phrases[key];
+      if (!pair) return;
+      if (ctx.state === "suspended") void ctx.resume();
+      const target = Math.max(pair.female.duration, pair.male.duration);
+      const playOne = (b: AudioBuffer, gain: number) => {
+        const src = ctx.createBufferSource();
+        src.buffer = b;
+        src.playbackRate.value = b.duration / target;
+        const g = ctx.createGain();
+        g.gain.value = gain;
+        src.connect(g).connect(buffers.analyser);
+        return src;
+      };
+      const startAt = ctx.currentTime + 0.02;
+      playOne(pair.female, 0.85).start(startAt);
+      playOne(pair.male, 0.85).start(startAt);
+
+      speakingFlagRef.current = true;
+      startMeter();
+      if (stopTimeoutRef.current != null) window.clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = window.setTimeout(
+        () => {
+          speakingFlagRef.current = false;
+          // emit a final 0 so subscribers settle to idle
+          listenersRef.current.forEach((cb) => cb(0));
+        },
+        Math.ceil((target + 0.25) * 1000),
+      );
+    },
+    [startMeter],
+  );
+
+  /** Public speak helper — call inside a click handler. Primes the context
+   *  in the same gesture frame, then schedules / queues the playback. */
+  const speak = useCallback(
+    (key: PhraseKey) => {
+      primeAudio();
+      performSpeak(key);
+    },
+    [primeAudio, performSpeak],
+  );
+
+  // ─── Standalone Daemon chat call ─────────────────────────────────────────
+  const sendChat = useCallback(
+    (history: ChatMsg[], originalInput?: string) => {
+      if (chatPending) return;
+      setChatPending(true);
+      setChatError(null);
+      void (async () => {
+        try {
+          const resp = await fetch("/api/daemon/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: history }),
+          });
+          if (!resp.ok) {
+            let detail = `HTTP ${resp.status}`;
+            try {
+              const body = (await resp.json()) as { message?: string; error?: string };
+              if (body.message) detail = body.message;
+              else if (body.error) detail = body.error;
+            } catch {
+              /* keep status */
+            }
+            throw new Error(detail);
+          }
+          const data = (await resp.json()) as { content?: string };
+          const content = (data.content ?? "").trim();
+          if (!content) throw new Error("empty Daemon response");
+          setChatHistory((h) => [...h, { role: "assistant", content }]);
+          setTranscript(content);
+          // Voice playback — context was primed in the originating gesture
+          // (sendChat is always called from a click/Enter handler), so
+          // performSpeak inside the async resolve is autoplay-safe.
+          performSpeak("daemon");
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          setChatError(message);
+          // Roll back the optimistically-added user turn AND restore the
+          // input text so the user can correct + retry without re-typing.
+          setChatHistory((h) =>
+            h.length > 0 && h[h.length - 1]!.role === "user" ? h.slice(0, -1) : h,
+          );
+          if (originalInput) setChatInput(originalInput);
+        } finally {
+          setChatPending(false);
+        }
+      })();
+    },
+    [chatPending, performSpeak],
+  );
+
+  const openDaemonChat = useCallback(() => {
+    // Prime the audio context in the same gesture frame so subsequent async
+    // playback (greeting onSuccess) is autoplay-safe even if buffers aren't
+    // decoded yet. Then play the daemon cue + shockwave for tactile feedback.
+    speak("daemon");
+    pulseIdRef.current += 1;
+    const pos = ROLE_ORB_POS.daemon;
+    setPulse({ key: "daemon", id: pulseIdRef.current, cx: pos.cx, cy: pos.cy });
+    if (!chatOpen) setChatOpen(true);
+    // First open of the session: ask the unbound Daemon to greet the user.
+    if (!greetedRef.current) {
+      greetedRef.current = true;
+      const seed: ChatMsg[] = [
+        {
+          role: "user",
+          content:
+            "I have just opened the Innoculus splash portal. Greet me as the unbound Daemon in two short sentences and invite me to ask a question.",
+        },
+      ];
+      // The seed is internal — don't surface it in the visible history.
+      setChatPending(true);
+      setChatError(null);
+      void (async () => {
+        try {
+          const resp = await fetch("/api/daemon/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: seed }),
+          });
+          if (!resp.ok) {
+            let detail = `HTTP ${resp.status}`;
+            try {
+              const body = (await resp.json()) as { message?: string; error?: string };
+              if (body.message) detail = body.message;
+              else if (body.error) detail = body.error;
+            } catch {
+              /* keep status */
+            }
+            throw new Error(detail);
+          }
+          const data = (await resp.json()) as { content?: string };
+          const content = (data.content ?? "").trim();
+          if (!content) throw new Error("empty Daemon response");
+          setChatHistory([{ role: "assistant", content }]);
+          setTranscript(content);
+          performSpeak("daemon");
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          setChatError(message);
+          // Allow retry on next open.
+          greetedRef.current = false;
+        } finally {
+          setChatPending(false);
+        }
+      })();
+    }
+  }, [chatOpen, speak, performSpeak]);
+
+  const closeDaemonChat = useCallback(() => {
+    setChatOpen(false);
+  }, []);
+
+  const submitChatInput = useCallback(() => {
+    const text = chatInput.trim();
+    if (!text || chatPending) return;
+    // Prime audio in this gesture frame so the async voice play after the
+    // chat reply can resume the AudioContext.
+    primeAudio();
+    const next: ChatMsg[] = [...chatHistory, { role: "user", content: text }];
+    setChatHistory(next);
+    setChatInput("");
+    sendChat(next, text);
+  }, [chatInput, chatPending, chatHistory, sendChat, primeAudio]);
+
+  // Autofocus the textarea when the chat opens so the user can type
+  // immediately. Also handle Escape-to-close on the chat surface.
+  useEffect(() => {
+    if (chatOpen) {
+      // requestAnimationFrame ensures the textarea is mounted before focus.
+      const id = requestAnimationFrame(() => {
+        inputElRef.current?.focus();
+      });
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setChatOpen(false);
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => {
+        cancelAnimationFrame(id);
+        window.removeEventListener("keydown", onKey);
+      };
+    }
+    return undefined;
+  }, [chatOpen]);
+
   const handleEnter = () => {
-    speak(voicesRef.current, "innoculus");
+    speak("innoculus");
     navigate("/dashboard");
   };
   const handleTutorial = () => {
-    speak(voicesRef.current, "initiation");
+    speak("initiation");
     navigate("/tutorial");
   };
-  /** Speak a role's phrase AND emit a one-shot prismatic shockwave from the
-   *  orb's center. Bumping pulseIdRef forces a fresh React key on the SVG
-   *  group so the CSS animation replays even on rapid repeated clicks. */
-  const fireRole = (key: "reckoner" | "daemon" | "judge") => {
-    speak(voicesRef.current, key);
+  const fireRole = (key: "reckoner" | "judge") => {
+    speak(key);
     const pos = ROLE_ORB_POS[key];
     pulseIdRef.current += 1;
     setPulse({ key, id: pulseIdRef.current, cx: pos.cx, cy: pos.cy });
-  };
-  const handleSpeak = (key: PhraseKey) => () => {
-    if (key === "reckoner" || key === "daemon" || key === "judge") {
-      fireRole(key);
-    } else {
-      speak(voicesRef.current, key);
-    }
   };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -166,10 +472,16 @@ export default function Splash() {
       handleTutorial();
     }
   };
-  const onKeySpeak = (key: PhraseKey) => (e: React.KeyboardEvent) => {
+  const onKeyDaemon = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      handleSpeak(key)();
+      openDaemonChat();
+    }
+  };
+  const onKeyRole = (key: "reckoner" | "judge") => (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fireRole(key);
     }
   };
   const hoverProps = (key: HoverKey) => ({
@@ -377,8 +689,8 @@ export default function Splash() {
               role name when clicked. No navigation; just a quick spoken cue. */}
           {/* Upper interior — The Reckoner */}
           <g
-            onClick={handleSpeak("reckoner")}
-            onKeyDown={onKeySpeak("reckoner")}
+            onClick={() => fireRole("reckoner")}
+            onKeyDown={onKeyRole("reckoner")}
             {...hoverProps("reckoner")}
             tabIndex={0}
             role="button"
@@ -395,30 +707,59 @@ export default function Splash() {
               filter="url(#ic-soft-glow)"
               style={{ transition: "r 280ms ease, fill 280ms ease" }} />
           </g>
-          {/* Center interior — The Daemon. The heart of the lens. */}
+          {/* Center interior — The Daemon. Click to summon the standalone
+              chat surface anchored below the diagram. While the Daemon is
+              speaking, halo + core radii are driven imperatively from the
+              shared analyser-node amplitude meter — so the orb pulses in
+              sync with the spoken word. */}
           <g
-            onClick={handleSpeak("daemon")}
-            onKeyDown={onKeySpeak("daemon")}
+            onClick={openDaemonChat}
+            onKeyDown={onKeyDaemon}
             {...hoverProps("daemon")}
             tabIndex={0}
             role="button"
-            aria-label="Speak: The Daemon"
+            aria-label={
+              chatOpen
+                ? "Daemon chat is open — click to replay greeting"
+                : "Summon the Daemon"
+            }
+            aria-pressed={chatOpen}
             data-testid="splash-daemon"
+            data-speaking={orbSpeaking ? "true" : "false"}
             style={{ cursor: "pointer", outline: "none" }}
           >
-            <circle cx="200" cy="360" r="36" fill="transparent" />
-            <circle cx="200" cy="360" r={hovered === "daemon" ? 32 : 26} fill="url(#ic-node-glow-soft)"
-              className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]"
-              style={{ animationDelay: "0.6s", transition: "r 280ms ease" }} />
-            <circle cx="200" cy="360" r={hovered === "daemon" ? 8 : 7}
-              fill={hovered === "daemon" ? "#ffffff" : "#f0f3f6"}
+            <circle cx="200" cy="360" r="40" fill="transparent" />
+            <circle
+              ref={daemonHaloRef}
+              cx="200"
+              cy="360"
+              r={26}
+              fill="url(#ic-node-glow-soft)"
+              opacity={0.55}
+              className={
+                orbSpeaking
+                  ? ""
+                  : "animate-[innoculus-breathe_4.2s_ease-in-out_infinite]"
+              }
+              style={{
+                animationDelay: orbSpeaking ? undefined : "0.6s",
+                transition: orbSpeaking ? "none" : "r 280ms ease, opacity 280ms ease",
+              }}
+            />
+            <circle
+              ref={daemonCoreRef}
+              cx="200"
+              cy="360"
+              r={7}
+              fill={orbSpeaking ? "#ffffff" : hovered === "daemon" ? "#ffffff" : "#f0f3f6"}
               filter="url(#ic-soft-glow)"
-              style={{ transition: "r 280ms ease, fill 280ms ease" }} />
+              style={{ transition: orbSpeaking ? "none" : "r 280ms ease, fill 280ms ease" }}
+            />
           </g>
           {/* Lower interior — The Judge */}
           <g
-            onClick={handleSpeak("judge")}
-            onKeyDown={onKeySpeak("judge")}
+            onClick={() => fireRole("judge")}
+            onKeyDown={onKeyRole("judge")}
             {...hoverProps("judge")}
             tabIndex={0}
             role="button"
@@ -505,6 +846,102 @@ export default function Splash() {
           </g>
         </svg>
       </div>
+
+      {/* Daemon chat surface — the "sentence bar" + input that anchors below
+          the diagram. Hidden until the user clicks the central Daemon orb.
+          Width-matched to the diagram so it visually belongs to the widget. */}
+      {chatOpen && (
+        <div
+          className="relative z-10 mt-6 w-[min(560px,90vw)] flex flex-col gap-3"
+          data-testid="daemon-chat-surface"
+          role="region"
+          aria-label="Daemon chat"
+        >
+          {/* Sentence bar — shows the Daemon's current spoken line. Pulses a
+              gentle outer glow while the voice is actually playing.
+              `aria-live=polite` so screen readers announce new transcripts. */}
+          <div
+            className="relative rounded-md border bg-black/60 px-4 py-3 backdrop-blur-sm transition-shadow duration-300"
+            style={{
+              borderColor: orbSpeaking ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.12)",
+              boxShadow: orbSpeaking
+                ? "0 0 24px rgba(255,255,255,0.18), inset 0 0 12px rgba(255,255,255,0.05)"
+                : "0 0 0 rgba(0,0,0,0)",
+            }}
+            data-testid="daemon-sentence-bar"
+            data-speaking={orbSpeaking ? "true" : "false"}
+          >
+            <button
+              type="button"
+              onClick={closeDaemonChat}
+              aria-label="Close Daemon chat"
+              data-testid="button-daemon-close"
+              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors p-1"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+            <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-mono mb-1 pr-6">
+              The Daemon
+            </div>
+            <div
+              className="text-sm leading-relaxed text-white/90 whitespace-pre-wrap min-h-[1.5em] pr-6"
+              data-testid="daemon-transcript"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {chatPending && !transcript ? (
+                <span className="inline-flex items-center gap-2 text-white/60 italic">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> The Daemon is gathering itself…
+                </span>
+              ) : chatError ? (
+                <span className="text-red-300/90">
+                  The Daemon is silent — {chatError}
+                </span>
+              ) : transcript ? (
+                transcript
+              ) : (
+                <span className="text-white/40 italic">
+                  Speak, and the Daemon will answer.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Input row */}
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputElRef}
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submitChatInput();
+                }
+              }}
+              placeholder="Ask the Daemon… (Enter to send, Esc to close)"
+              disabled={chatPending}
+              data-testid="input-splash-daemon-message"
+              className="flex-1 min-h-[44px] max-h-[120px] resize-none rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:outline-none focus:border-white/30 disabled:opacity-60"
+              rows={1}
+            />
+            <button
+              type="button"
+              onClick={submitChatInput}
+              disabled={!chatInput.trim() || chatPending}
+              data-testid="button-splash-daemon-send"
+              className="h-[44px] w-[44px] inline-flex items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Send to Daemon"
+            >
+              {chatPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
