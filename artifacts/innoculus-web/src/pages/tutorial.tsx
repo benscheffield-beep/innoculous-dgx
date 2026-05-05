@@ -67,7 +67,7 @@ export default function Tutorial() {
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
             <PipelineNode icon={ShieldCheck} name="Judge" role="checks" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={FileBox} name="Artifact" role="emits" />
+            <PipelineNode icon={FileBox} name="Relic" role="emits" />
           </div>
 
           <div className="mt-8 grid gap-6 md:grid-cols-2">
@@ -102,10 +102,10 @@ export default function Tutorial() {
             </div>
             <div>
               <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground mb-2">
-                Artifact
+                Relic
               </h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                The verified result is sealed as an Artifact — an immutable, queryable record
+                The verified result is sealed as a Relic — an immutable, queryable record
                 with diagnostics, payload, and verdict attached.
               </p>
             </div>
@@ -155,7 +155,7 @@ export default function Tutorial() {
               Complete
             </Badge>
             <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-              All checks passed. The artifact is trustworthy and ready for downstream use.
+              All checks passed. The relic is trustworthy and ready for downstream use.
             </p>
           </div>
           <div className="flex items-start gap-3">
@@ -172,7 +172,7 @@ export default function Tutorial() {
               Failed
             </Badge>
             <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-              A hard check failed. The artifact is not trustworthy. Review the failure
+              A hard check failed. The relic is not trustworthy. Review the failure
               and retry from the job detail page.
             </p>
           </div>
@@ -203,7 +203,7 @@ export default function Tutorial() {
             then a final verdict.
           </Step>
           <Step num="3" title="Read the diagnostics">
-            On the innoculant detail page you get the verdict, the artifact payload, and the full
+            On the innoculant detail page you get the verdict, the relic payload, and the full
             diagnostic table. Toggle <span className="font-mono text-foreground">Operator Mode</span>{" "}
             in the sidebar to reveal advanced metrics like the Warburg trio, truncation
             error, and policy fields.

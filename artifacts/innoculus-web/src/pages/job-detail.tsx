@@ -218,11 +218,11 @@ export default function JobDetail() {
         </div>
       )}
 
-      {/* Artifact Viewer */}
+      {/* Relic Viewer */}
       {artifact && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold tracking-tight">Artifact</h3>
+            <h3 className="text-xl font-bold tracking-tight">Relic</h3>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-white/10 font-mono">v{artifact.version}</Badge>
               <Badge variant="outline" className="border-white/10 font-mono" title={artifact.hash}>{artifact.hash.substring(0,8)}...{artifact.hash.substring(artifact.hash.length-8)}</Badge>
@@ -235,7 +235,7 @@ export default function JobDetail() {
               <CardContent className="p-0">
                 {!isDev ? (
                   <div className="p-6">
-                    <p className="text-muted-foreground">Innoculum produced an artifact at version {artifact.version}.</p>
+                    <p className="text-muted-foreground">Innoculum produced a relic at version {artifact.version}.</p>
                   </div>
                 ) : (
                   <Tabs defaultValue="raw" className="w-full">
