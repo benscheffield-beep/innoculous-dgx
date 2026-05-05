@@ -52,7 +52,7 @@ export default function Dashboard() {
       ) : stats ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard 
-            title="Total Jobs" 
+            title="Total Innoculants" 
             value={stats.total} 
             icon={Activity} 
             description={`${stats.recent_24h} in last 24h`} 
@@ -64,7 +64,7 @@ export default function Dashboard() {
             description={`${stats.by_verdict?.pass || 0} passed`}
           />
           <StatCard 
-            title="Numerical Jobs" 
+            title="Numerical Innoculants" 
             value={stats.by_kind?.numerical || 0} 
             icon={BarChart3} 
           />
@@ -112,7 +112,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground">
-              No jobs found in the pipeline.
+              No innoculants found in the pipeline.
             </div>
           )}
         </CardContent>

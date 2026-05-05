@@ -168,14 +168,14 @@ export default function Submit() {
   const submitRequest = (req: CreateJobRequest) => {
     createJob.mutate({ data: req }, {
       onSuccess: (job) => {
-        toast({ title: "Job created successfully", description: `ID: ${job.id}` });
+        toast({ title: "Innoculant created successfully", description: `ID: ${job.id}` });
         queryClient.invalidateQueries({ queryKey: getListJobsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetJobStatsQueryKey() });
         setLocation(`/jobs/${job.id}`);
       },
       onError: (err: unknown) => {
         const message = err instanceof Error ? err.message : "Unknown error";
-        toast({ title: "Failed to create job", description: message, variant: "destructive" });
+        toast({ title: "Failed to create innoculant", description: message, variant: "destructive" });
       }
     });
   };
@@ -339,7 +339,7 @@ export default function Submit() {
 
                   <Button type="submit" disabled={createJob.isPending} className="w-full" data-testid="button-submit-job">
                     {createJob.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Submit Numerical Job
+                    Initiate Numerical Innoculant
                   </Button>
                 </form>
               </Form>
@@ -423,7 +423,7 @@ export default function Submit() {
 
                   <Button type="submit" disabled={createJob.isPending} className="w-full" data-testid="button-submit-job">
                     {createJob.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Submit Trace Job
+                    Initiate Trace Innoculant
                   </Button>
                 </form>
               </Form>

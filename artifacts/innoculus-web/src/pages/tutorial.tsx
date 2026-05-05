@@ -56,7 +56,7 @@ export default function Tutorial() {
         <CardHeader>
           <CardTitle>The Pipeline</CardTitle>
           <CardDescription>
-            Every job flows through four roles. Each role hands its output to the next.
+            Every innoculant flows through four roles. Each role hands its output to the next.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -76,7 +76,7 @@ export default function Tutorial() {
                 Manager
               </h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                The Manager receives the job specification, plans the strategy, and dispatches
+                The Manager receives the innoculant specification, plans the strategy, and dispatches
                 work to the Editor. It is the only operator-facing entry point — the portal
                 you tap from the splash screen.
               </p>
@@ -113,7 +113,7 @@ export default function Tutorial() {
         </CardContent>
       </Card>
 
-      {/* Job kinds */}
+      {/* Innoculants */}
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Innoculants</CardTitle>
@@ -183,7 +183,7 @@ export default function Tutorial() {
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Quick Start</CardTitle>
-          <CardDescription>Run your first job in three steps.</CardDescription>
+          <CardDescription>Run your first innoculant in three steps.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <Step num="1" title="Initiate an innoculant">
@@ -195,7 +195,7 @@ export default function Tutorial() {
             Fill the form and submit.
           </Step>
           <Step num="2" title="Watch it move through the pipeline">
-            The job appears under{" "}
+            The innoculant appears under{" "}
             <Link href="/jobs" className="text-primary hover:underline inline-flex items-center gap-1">
               <List className="w-3 h-3" /> All Innoculations
             </Link>
@@ -203,7 +203,7 @@ export default function Tutorial() {
             then a final verdict.
           </Step>
           <Step num="3" title="Read the diagnostics">
-            On the job detail page you get the verdict, the artifact payload, and the full
+            On the innoculant detail page you get the verdict, the artifact payload, and the full
             diagnostic table. Toggle <span className="font-mono text-foreground">Dev Mode</span>{" "}
             in the sidebar to reveal advanced metrics like the Warburg trio, truncation
             error, and policy fields.

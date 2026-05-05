@@ -45,7 +45,7 @@ export default function JobDetail() {
   const handleRetry = () => {
     retryJob.mutate({ id }, {
       onSuccess: () => {
-        toast({ title: "Job retry initiated" });
+        toast({ title: "Innoculant retry initiated" });
         queryClient.invalidateQueries({ queryKey: getGetJobQueryKey(id) });
         queryClient.invalidateQueries({ queryKey: getListJobsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetJobStatsQueryKey() });
@@ -76,8 +76,8 @@ export default function JobDetail() {
     return (
       <div className="space-y-6 max-w-5xl mx-auto flex flex-col items-center justify-center min-h-[50vh]">
         <XCircle className="w-12 h-12 text-muted-foreground" />
-        <h2 className="text-2xl font-bold">Job not found</h2>
-        <Link href="/jobs" className="text-primary hover:underline">Return to jobs</Link>
+        <h2 className="text-2xl font-bold">Innoculant not found</h2>
+        <Link href="/jobs" className="text-primary hover:underline">Return to innoculants</Link>
       </div>
     );
   }
@@ -97,7 +97,7 @@ export default function JobDetail() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <Link href="/jobs" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-2">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Back to jobs
+            <ArrowLeft className="w-4 h-4 mr-1" /> Back to innoculants
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight font-mono break-all" data-testid="text-job-id">{job.id}</h1>
@@ -117,7 +117,7 @@ export default function JobDetail() {
         {(job.status === "failed" || job.status === "complete_with_warnings") && (
           <Button variant="outline" onClick={handleRetry} disabled={retryJob.isPending} data-testid="button-retry-job" className="border-white/10 shrink-0">
             {retryJob.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCw className="w-4 h-4 mr-2" />}
-            Retry Job
+            Retry Innoculant
           </Button>
         )}
       </div>
