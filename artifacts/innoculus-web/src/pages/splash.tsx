@@ -491,19 +491,6 @@ export default function Splash() {
             data-testid="splash-enter"
             style={{ cursor: "pointer", outline: "none" }}
           >
-            {/* White radiating concentric rings — only on the top node */}
-            <circle cx="200" cy="60" r="22" fill="none" stroke="#ffffff"
-              strokeWidth="1" strokeOpacity="0.7"
-              className="animate-[innoculus-radiate_3s_ease-out_infinite]" />
-            <circle cx="200" cy="60" r="22" fill="none" stroke="#ffffff"
-              strokeWidth="1" strokeOpacity="0.7"
-              className="animate-[innoculus-radiate_3s_ease-out_infinite]"
-              style={{ animationDelay: "1s" }} />
-            <circle cx="200" cy="60" r="22" fill="none" stroke="#ffffff"
-              strokeWidth="1" strokeOpacity="0.7"
-              className="animate-[innoculus-radiate_3s_ease-out_infinite]"
-              style={{ animationDelay: "2s" }} />
-
             {/* Generous transparent hit target */}
             <circle cx="200" cy="60" r="44" fill="transparent" />
 
