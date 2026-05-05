@@ -89,9 +89,24 @@ function speak(voices: LoadedVoices | null, key: PhraseKey) {
 
 type HoverKey = PhraseKey | "tutorial";
 
+/** A one-shot prismatic shockwave originating at (cx, cy) for the named role.
+ *  The numeric `id` is bumped on every fire so React can remount the SVG
+ *  group via `key={pulse.id}` and replay the CSS animation even on rapid
+ *  consecutive clicks of the same orb. */
+type Pulse = { key: PhraseKey; id: number; cx: number; cy: number };
+
+/** Coordinates of the three role orbs in the splash SVG (viewBox 400x720). */
+const ROLE_ORB_POS: Record<"reckoner" | "daemon" | "judge", { cx: number; cy: number }> = {
+  reckoner: { cx: 200, cy: 220 },
+  daemon:   { cx: 200, cy: 360 },
+  judge:    { cx: 200, cy: 500 },
+};
+
 export default function Splash() {
   const [, navigate] = useLocation();
   const [hovered, setHovered] = useState<HoverKey | null>(null);
+  const [pulse, setPulse] = useState<Pulse | null>(null);
+  const pulseIdRef = useRef(0);
 
   const voicesRef = useRef<LoadedVoices | null>(null);
   useEffect(() => {
@@ -123,7 +138,22 @@ export default function Splash() {
     speak(voicesRef.current, "initiation");
     navigate("/tutorial");
   };
-  const handleSpeak = (key: PhraseKey) => () => speak(voicesRef.current, key);
+  /** Speak a role's phrase AND emit a one-shot prismatic shockwave from the
+   *  orb's center. Bumping pulseIdRef forces a fresh React key on the SVG
+   *  group so the CSS animation replays even on rapid repeated clicks. */
+  const fireRole = (key: "reckoner" | "daemon" | "judge") => {
+    speak(voicesRef.current, key);
+    const pos = ROLE_ORB_POS[key];
+    pulseIdRef.current += 1;
+    setPulse({ key, id: pulseIdRef.current, cx: pos.cx, cy: pos.cy });
+  };
+  const handleSpeak = (key: PhraseKey) => () => {
+    if (key === "reckoner" || key === "daemon" || key === "judge") {
+      fireRole(key);
+    } else {
+      speak(voicesRef.current, key);
+    }
+  };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -139,7 +169,7 @@ export default function Splash() {
   const onKeySpeak = (key: PhraseKey) => (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      speak(voicesRef.current, key);
+      handleSpeak(key)();
     }
   };
   const hoverProps = (key: HoverKey) => ({
@@ -426,6 +456,29 @@ export default function Splash() {
               filter="url(#ic-soft-glow)"
               style={{ transition: "r 280ms ease, fill 280ms ease" }} />
           </g>
+
+          {/* Refractive symmetric shockwave — fires once when a role orb is
+              clicked. Three staggered ring fronts; each front is three colored
+              rings (cyan / white / magenta) with a small x-offset so the
+              expanding edge reads as a chromatic, refractive split. Bumping
+              the React `key` on every fire forces a clean replay. */}
+          {pulse && (
+            <g key={pulse.id} pointerEvents="none">
+              {[0, 140, 280].map((delay) => (
+                <g key={delay} style={{ mixBlendMode: "screen" }}>
+                  <circle cx={pulse.cx - 1.6} cy={pulse.cy} r="8" fill="none"
+                    stroke="#7ad8ff"
+                    style={{ animation: `innoculus-shock 950ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
+                  <circle cx={pulse.cx} cy={pulse.cy} r="8" fill="none"
+                    stroke="#ffffff"
+                    style={{ animation: `innoculus-shock 950ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
+                  <circle cx={pulse.cx + 1.6} cy={pulse.cy} r="8" fill="none"
+                    stroke="#ff89c6"
+                    style={{ animation: `innoculus-shock 950ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
+                </g>
+              ))}
+            </g>
+          )}
 
           {/* TOP NODE — the clickable portal */}
           <g
