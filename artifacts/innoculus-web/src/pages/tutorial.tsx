@@ -214,7 +214,7 @@ export default function Tutorial() {
       {/* Modes */}
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle>User vs Operator Mode</CardTitle>
+          <CardTitle>Use vs Op</CardTitle>
           <CardDescription>Toggle in the sidebar.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
