@@ -137,7 +137,7 @@ export default function Tutorial() {
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Innoculants</CardTitle>
-          <CardDescription>Two flavors of work the innoculum accepts.</CardDescription>
+          <CardDescription>A discrete or continuous innoculation to execute.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="p-4 rounded-md bg-black/30 border border-white/5">
