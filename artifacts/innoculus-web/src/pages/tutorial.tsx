@@ -46,7 +46,7 @@ export default function Tutorial() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Tutorial</h1>
           <p className="text-muted-foreground mt-1 font-mono text-sm">
-            How the Innoculus pipeline works.
+            Learning Innoculation
           </p>
         </div>
       </div>
