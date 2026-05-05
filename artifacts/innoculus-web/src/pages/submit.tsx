@@ -185,7 +185,7 @@ export default function Submit() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Submit Job</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Initiate Innoculants</h1>
         <p className="text-muted-foreground mt-2 font-mono text-sm">Enqueue a new pipeline workload.</p>
       </div>
 

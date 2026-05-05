@@ -186,10 +186,10 @@ export default function Tutorial() {
           <CardDescription>Run your first job in three steps.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Step num="1" title="Submit a job">
+          <Step num="1" title="Initiate an innoculant">
             Go to{" "}
             <Link href="/submit" className="text-primary hover:underline inline-flex items-center gap-1">
-              <Play className="w-3 h-3" /> Submit Job
+              <Play className="w-3 h-3" /> Initiate Innoculants
             </Link>{" "}
             and pick a tab — Numerical for a single evaluation, Cutoff Trace for a sweep.
             Fill the form and submit.
