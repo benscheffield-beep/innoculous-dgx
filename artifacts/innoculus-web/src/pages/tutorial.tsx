@@ -167,7 +167,7 @@ export default function Tutorial() {
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Verdicts</CardTitle>
-          <CardDescription>What the Judge can return.</CardDescription>
+          <CardDescription>The qualitative status of relics.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-start gap-3">
