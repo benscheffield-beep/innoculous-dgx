@@ -2,16 +2,26 @@ import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Pre-rendered "Innoculus" voice clips (female + male) decoded once into AudioBuffers
- * so we can fire both through the Web Audio API on the same audio frame. This is
- * sample-accurate, unlike two parallel HTMLAudioElement.play() calls which can
- * drift by tens of milliseconds at the JS layer. Clips are pre-trimmed to remove
- * leading/trailing silence, so the words start in lockstep.
+ * Pre-rendered voice clips (female + male) for each phrase, decoded once into
+ * AudioBuffers so we can fire both voices through the Web Audio API on the same
+ * audio frame. This is sample-accurate, unlike two parallel HTMLAudioElement.play()
+ * calls which can drift by tens of milliseconds at the JS layer. Clips are
+ * pre-trimmed to remove leading/trailing silence so the words start in lockstep.
  */
+type PhraseKey = "innoculus" | "reckoner" | "daemon" | "judge" | "initiation";
+
+const PHRASE_FILES: Record<PhraseKey, { female: string; male: string }> = {
+  innoculus: { female: "innoculus-female.mp3", male: "innoculus-male.mp3" },
+  reckoner: { female: "reckoner-female.mp3", male: "reckoner-male.mp3" },
+  daemon: { female: "daemon-female.mp3", male: "daemon-male.mp3" },
+  judge: { female: "judge-female.mp3", male: "judge-male.mp3" },
+  initiation: { female: "initiation-female.mp3", male: "initiation-male.mp3" },
+};
+
+type VoicePair = { female: AudioBuffer; male: AudioBuffer };
 type LoadedVoices = {
   ctx: AudioContext;
-  female: AudioBuffer;
-  male: AudioBuffer;
+  phrases: Record<PhraseKey, VoicePair>;
 };
 
 async function loadVoices(): Promise<LoadedVoices | null> {
@@ -24,35 +34,44 @@ async function loadVoices(): Promise<LoadedVoices | null> {
   let ctx: AudioContext | null = null;
   try {
     ctx = new Ctx();
-    const [femResp, masResp] = await Promise.all([
-      fetch(`${base}audio/innoculus-female.mp3`),
-      fetch(`${base}audio/innoculus-male.mp3`),
-    ]);
-    if (!femResp.ok || !masResp.ok) {
-      void ctx.close();
-      return null;
-    }
-    const [femBuf, masBuf] = await Promise.all([
-      femResp.arrayBuffer(),
-      masResp.arrayBuffer(),
-    ]);
-    const [female, male] = await Promise.all([
-      ctx.decodeAudioData(femBuf),
-      ctx.decodeAudioData(masBuf),
-    ]);
-    return { ctx, female, male };
+    const keys = Object.keys(PHRASE_FILES) as PhraseKey[];
+    const decoded = await Promise.all(
+      keys.map(async (key): Promise<[PhraseKey, VoicePair]> => {
+        const files = PHRASE_FILES[key];
+        const [femResp, masResp] = await Promise.all([
+          fetch(`${base}audio/${files.female}`),
+          fetch(`${base}audio/${files.male}`),
+        ]);
+        if (!femResp.ok || !masResp.ok) {
+          throw new Error(`fetch failed for ${key}`);
+        }
+        const [femBuf, masBuf] = await Promise.all([
+          femResp.arrayBuffer(),
+          masResp.arrayBuffer(),
+        ]);
+        const [female, male] = await Promise.all([
+          ctx!.decodeAudioData(femBuf),
+          ctx!.decodeAudioData(masBuf),
+        ]);
+        return [key, { female, male }];
+      }),
+    );
+    const phrases = Object.fromEntries(decoded) as Record<PhraseKey, VoicePair>;
+    return { ctx, phrases };
   } catch {
     if (ctx) void ctx.close();
     return null;
   }
 }
 
-function speakInnoculus(voices: LoadedVoices | null) {
+function speak(voices: LoadedVoices | null, key: PhraseKey) {
   if (!voices) return;
-  const { ctx, female, male } = voices;
+  const { ctx, phrases } = voices;
+  const pair = phrases[key];
+  if (!pair) return;
   if (ctx.state === "suspended") void ctx.resume();
   // Stretch the shorter clip so both finish at the same instant.
-  const target = Math.max(female.duration, male.duration);
+  const target = Math.max(pair.female.duration, pair.male.duration);
   const playOne = (buf: AudioBuffer, gain: number) => {
     const src = ctx.createBufferSource();
     src.buffer = buf;
@@ -64,15 +83,15 @@ function speakInnoculus(voices: LoadedVoices | null) {
   };
   // Schedule both starts at the exact same audio time — sample-accurate sync.
   const startAt = ctx.currentTime + 0.02;
-  playOne(female, 0.85).start(startAt);
-  playOne(male, 0.85).start(startAt);
+  playOne(pair.female, 0.85).start(startAt);
+  playOne(pair.male, 0.85).start(startAt);
 }
+
+type HoverKey = PhraseKey | "tutorial";
 
 export default function Splash() {
   const [, navigate] = useLocation();
-  const [hover, setHover] = useState(false);
-
-  const [hoverTutorial, setHoverTutorial] = useState(false);
+  const [hovered, setHovered] = useState<HoverKey | null>(null);
 
   const voicesRef = useRef<LoadedVoices | null>(null);
   useEffect(() => {
@@ -97,10 +116,14 @@ export default function Splash() {
   }, []);
 
   const handleEnter = () => {
-    speakInnoculus(voicesRef.current);
+    speak(voicesRef.current, "innoculus");
     navigate("/dashboard");
   };
-  const handleTutorial = () => navigate("/tutorial");
+  const handleTutorial = () => {
+    speak(voicesRef.current, "initiation");
+    navigate("/tutorial");
+  };
+  const handleSpeak = (key: PhraseKey) => () => speak(voicesRef.current, key);
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -113,6 +136,16 @@ export default function Splash() {
       handleTutorial();
     }
   };
+  const onKeySpeak = (key: PhraseKey) => (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      speak(voicesRef.current, key);
+    }
+  };
+  const hoverProps = (key: HoverKey) => ({
+    onMouseEnter: () => setHovered(key),
+    onMouseLeave: () => setHovered((h) => (h === key ? null : h)),
+  });
 
   return (
     <div
@@ -310,33 +343,73 @@ export default function Splash() {
             style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
           />
 
-          {/* Interior nodes — silicon grey body, white halo */}
-          {/* Upper interior */}
-          <g>
-            <circle cx="200" cy="220" r="22" fill="url(#ic-node-glow-soft)"
-              className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]" />
-            <circle cx="200" cy="220" r="6" fill="#e6e9ec" filter="url(#ic-soft-glow)" />
-          </g>
-          {/* Center interior — the heart of the lens */}
-          <g>
-            <circle cx="200" cy="360" r="26" fill="url(#ic-node-glow-soft)"
+          {/* Interior nodes — silicon grey body, white halo. Each speaks its
+              role name when clicked. No navigation; just a quick spoken cue. */}
+          {/* Upper interior — The Reckoner */}
+          <g
+            onClick={handleSpeak("reckoner")}
+            onKeyDown={onKeySpeak("reckoner")}
+            {...hoverProps("reckoner")}
+            tabIndex={0}
+            role="button"
+            aria-label="Speak: The Reckoner"
+            data-testid="splash-reckoner"
+            style={{ cursor: "pointer", outline: "none" }}
+          >
+            <circle cx="200" cy="220" r="32" fill="transparent" />
+            <circle cx="200" cy="220" r={hovered === "reckoner" ? 28 : 22} fill="url(#ic-node-glow-soft)"
               className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]"
-              style={{ animationDelay: "0.6s" }} />
-            <circle cx="200" cy="360" r="7" fill="#f0f3f6" filter="url(#ic-soft-glow)" />
+              style={{ transition: "r 280ms ease" }} />
+            <circle cx="200" cy="220" r={hovered === "reckoner" ? 7 : 6}
+              fill={hovered === "reckoner" ? "#ffffff" : "#e6e9ec"}
+              filter="url(#ic-soft-glow)"
+              style={{ transition: "r 280ms ease, fill 280ms ease" }} />
           </g>
-          {/* Lower interior */}
-          <g>
-            <circle cx="200" cy="500" r="22" fill="url(#ic-node-glow-soft)"
+          {/* Center interior — The Daemon. The heart of the lens. */}
+          <g
+            onClick={handleSpeak("daemon")}
+            onKeyDown={onKeySpeak("daemon")}
+            {...hoverProps("daemon")}
+            tabIndex={0}
+            role="button"
+            aria-label="Speak: The Daemon"
+            data-testid="splash-daemon"
+            style={{ cursor: "pointer", outline: "none" }}
+          >
+            <circle cx="200" cy="360" r="36" fill="transparent" />
+            <circle cx="200" cy="360" r={hovered === "daemon" ? 32 : 26} fill="url(#ic-node-glow-soft)"
               className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]"
-              style={{ animationDelay: "1.2s" }} />
-            <circle cx="200" cy="500" r="6" fill="#e6e9ec" filter="url(#ic-soft-glow)" />
+              style={{ animationDelay: "0.6s", transition: "r 280ms ease" }} />
+            <circle cx="200" cy="360" r={hovered === "daemon" ? 8 : 7}
+              fill={hovered === "daemon" ? "#ffffff" : "#f0f3f6"}
+              filter="url(#ic-soft-glow)"
+              style={{ transition: "r 280ms ease, fill 280ms ease" }} />
+          </g>
+          {/* Lower interior — The Judge */}
+          <g
+            onClick={handleSpeak("judge")}
+            onKeyDown={onKeySpeak("judge")}
+            {...hoverProps("judge")}
+            tabIndex={0}
+            role="button"
+            aria-label="Speak: The Judge"
+            data-testid="splash-judge"
+            style={{ cursor: "pointer", outline: "none" }}
+          >
+            <circle cx="200" cy="500" r="32" fill="transparent" />
+            <circle cx="200" cy="500" r={hovered === "judge" ? 28 : 22} fill="url(#ic-node-glow-soft)"
+              className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]"
+              style={{ animationDelay: "1.2s", transition: "r 280ms ease" }} />
+            <circle cx="200" cy="500" r={hovered === "judge" ? 7 : 6}
+              fill={hovered === "judge" ? "#ffffff" : "#e6e9ec"}
+              filter="url(#ic-soft-glow)"
+              style={{ transition: "r 280ms ease, fill 280ms ease" }} />
           </g>
           {/* Bottom node — Tutorial portal */}
           <g
             onClick={handleTutorial}
             onKeyDown={onKeyTutorial}
-            onMouseEnter={() => setHoverTutorial(true)}
-            onMouseLeave={() => setHoverTutorial(false)}
+            {...hoverProps("tutorial")}
             tabIndex={0}
             role="button"
             aria-label="Open tutorial"
@@ -345,11 +418,11 @@ export default function Splash() {
           >
             {/* Generous transparent hit target */}
             <circle cx="200" cy="660" r="32" fill="transparent" />
-            <circle cx="200" cy="660" r={hoverTutorial ? 20 : 14} fill="url(#ic-node-glow-soft)"
+            <circle cx="200" cy="660" r={hovered === "tutorial" ? 20 : 14} fill="url(#ic-node-glow-soft)"
               className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]"
               style={{ animationDelay: "2.1s", transition: "r 280ms ease" }} />
-            <circle cx="200" cy="660" r={hoverTutorial ? 5 : 4}
-              fill={hoverTutorial ? "#ffffff" : "#c0c5cb"}
+            <circle cx="200" cy="660" r={hovered === "tutorial" ? 5 : 4}
+              fill={hovered === "tutorial" ? "#ffffff" : "#c0c5cb"}
               filter="url(#ic-soft-glow)"
               style={{ transition: "r 280ms ease, fill 280ms ease" }} />
           </g>
@@ -358,8 +431,7 @@ export default function Splash() {
           <g
             onClick={handleEnter}
             onKeyDown={onKey}
-            onMouseEnter={() => setHover(true)}
-            onMouseLeave={() => setHover(false)}
+            {...hoverProps("innoculus")}
             tabIndex={0}
             role="button"
             aria-label="Enter Innoculus dashboard"
@@ -383,8 +455,8 @@ export default function Splash() {
             <circle cx="200" cy="60" r="44" fill="transparent" />
 
             {/* Outer halo */}
-            <circle cx="200" cy="60" r={hover ? 32 : 26} fill="url(#ic-node-glow)"
-              style={{ transition: "r 280ms ease, opacity 280ms ease", opacity: hover ? 1 : 0.85 }} />
+            <circle cx="200" cy="60" r={hovered === "innoculus" ? 32 : 26} fill="url(#ic-node-glow)"
+              style={{ transition: "r 280ms ease, opacity 280ms ease", opacity: hovered === "innoculus" ? 1 : 0.85 }} />
             {/* Pulsing core */}
             <circle cx="200" cy="60" r="9" fill="#ffffff" filter="url(#ic-soft-glow)"
               className="animate-[innoculus-core_2.2s_ease-in-out_infinite]" />
