@@ -116,7 +116,7 @@ export default function Tutorial() {
       {/* Job kinds */}
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle>Job Kinds</CardTitle>
+          <CardTitle>Innoculants</CardTitle>
           <CardDescription>Two flavors of work the pipeline accepts.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
