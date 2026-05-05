@@ -244,29 +244,6 @@ export default function Tutorial() {
         </CardContent>
       </Card>
 
-      {/* Modes */}
-      <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle>Use vs Op</CardTitle>
-          <CardDescription>Toggle in the sidebar.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="p-4 rounded-md bg-black/30 border border-white/5">
-            <h4 className="font-semibold text-sm uppercase tracking-wide mb-2">User</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Surfaces verdicts and prose explanations. Hides truncation, latency,
-              precision, and policy fields.
-            </p>
-          </div>
-          <div className="p-4 rounded-md bg-black/30 border border-white/5">
-            <h4 className="font-semibold text-sm uppercase tracking-wide mb-2">Operator</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Reveals every metric the Judge emits, including the Warburg trio
-              (residual, slope, ν), truncation error, and policy decisions.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
