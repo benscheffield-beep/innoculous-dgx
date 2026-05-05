@@ -32,22 +32,37 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-function VerdictPill({ verdict, label }: { verdict: Verdict; label: string }) {
-  const cls =
-    verdict === "pass"
-      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-      : verdict === "warn"
-        ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-        : "bg-destructive/10 text-destructive border-destructive/20";
+function verdictColor(v: Verdict) {
+  return v === "pass"
+    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+    : v === "warn"
+      ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+      : "bg-destructive/10 text-destructive border-destructive/20";
+}
+
+function UnifiedVerdictBadge({ verdict }: { verdict: Verdict }) {
   const Icon = verdict === "pass" ? CheckCircle2 : verdict === "warn" ? AlertTriangle : XCircle;
   return (
-    <div className={`rounded-md border p-4 ${cls}`} data-testid={`subverdict-${label.toLowerCase()}`}>
-      <div className="flex items-center gap-2 mb-1">
-        <Icon className="w-4 h-4" />
-        <span className="text-xs font-mono uppercase tracking-wider opacity-80">{label}</span>
-      </div>
-      <div className="text-lg font-semibold capitalize">{verdict}</div>
-    </div>
+    <Badge
+      variant="outline"
+      className={`text-base px-3 py-1.5 font-bold uppercase tracking-wider gap-2 ${verdictColor(verdict)}`}
+      data-testid="badge-unified-verdict"
+    >
+      <Icon className="w-4 h-4" />
+      {verdict}
+    </Badge>
+  );
+}
+
+function SubVerdictBadge({ verdict, label }: { verdict: Verdict; label: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className={`text-xs font-mono uppercase tracking-wider ${verdictColor(verdict)}`}
+      data-testid={`subverdict-${label.toLowerCase()}`}
+    >
+      {label}: {verdict}
+    </Badge>
   );
 }
 
@@ -313,6 +328,16 @@ export default function JobDetail() {
         <div className="space-y-4">
           <h3 className="text-xl font-bold tracking-tight">Diagnostics</h3>
 
+          {/* Innoculation header: one unified verdict badge + two smaller
+              adjacent sub-verdict badges, matching the task-spec contract. */}
+          {isInnoculation && innocPayload && (
+            <div className="flex flex-wrap items-center gap-2" data-testid="row-verdict-header">
+              <UnifiedVerdictBadge verdict={diagnostics.verdict} />
+              <SubVerdictBadge verdict={innocPayload.sub_verdicts.numerical} label="Spectral" />
+              <SubVerdictBadge verdict={innocPayload.sub_verdicts.cutoff_trace} label="Speculative" />
+            </div>
+          )}
+
           <Card className={`border-white/5 backdrop-blur-sm ${
             diagnostics.verdict === "pass" ? "bg-emerald-500/5 border-emerald-500/20" :
             diagnostics.verdict === "warn" ? "bg-yellow-500/5 border-yellow-500/20" :
@@ -331,14 +356,6 @@ export default function JobDetail() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Per-phase sub-verdict pills (innoculation only) */}
-          {isInnoculation && innocPayload && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <VerdictPill verdict={innocPayload.sub_verdicts.numerical} label="Spectral" />
-              <VerdictPill verdict={innocPayload.sub_verdicts.cutoff_trace} label="Speculative" />
-            </div>
-          )}
 
           {isDev && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
