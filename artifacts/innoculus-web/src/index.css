@@ -35,11 +35,14 @@
 /* One-shot prismatic shockwave for role-orb clicks. Animates the SVG `r`
    geometry attribute (supported in modern browsers) so each ring expands
    outward from the orb center; three colored rings (cyan / white / magenta)
-   with a tiny x-offset render together to suggest a refractive split. */
+   with an x-offset render together to suggest a refractive split. The bright
+   phase is held longer (8% → 55%) so the eye actually catches the wave
+   sweeping outward instead of seeing it vanish before it travels. */
 @keyframes innoculus-shock {
-  0%   { r: 8;  stroke-opacity: 0;    stroke-width: 1.6; }
-  12%  {        stroke-opacity: 0.95;                    }
-  100% { r: 90; stroke-opacity: 0;    stroke-width: 0.3; }
+  0%   { r: 10;  stroke-opacity: 0;    stroke-width: 2.6; }
+  8%   {         stroke-opacity: 1;                       }
+  55%  {         stroke-opacity: 0.85; stroke-width: 1.6; }
+  100% { r: 170; stroke-opacity: 0;    stroke-width: 0.4; }
 }
 
 @custom-variant dark (&:is(.dark *));

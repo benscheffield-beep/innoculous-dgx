@@ -463,18 +463,18 @@ export default function Splash() {
               expanding edge reads as a chromatic, refractive split. Bumping
               the React `key` on every fire forces a clean replay. */}
           {pulse && (
-            <g key={pulse.id} pointerEvents="none">
-              {[0, 140, 280].map((delay) => (
+            <g key={pulse.id} pointerEvents="none" filter="url(#ic-soft-glow)">
+              {[0, 200, 400].map((delay) => (
                 <g key={delay} style={{ mixBlendMode: "screen" }}>
-                  <circle cx={pulse.cx - 1.6} cy={pulse.cy} r="8" fill="none"
-                    stroke="#7ad8ff"
-                    style={{ animation: `innoculus-shock 950ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
-                  <circle cx={pulse.cx} cy={pulse.cy} r="8" fill="none"
+                  <circle cx={pulse.cx - 3.5} cy={pulse.cy} r="10" fill="none"
+                    stroke="#5fd0ff"
+                    style={{ animation: `innoculus-shock 1400ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
+                  <circle cx={pulse.cx} cy={pulse.cy} r="10" fill="none"
                     stroke="#ffffff"
-                    style={{ animation: `innoculus-shock 950ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
-                  <circle cx={pulse.cx + 1.6} cy={pulse.cy} r="8" fill="none"
-                    stroke="#ff89c6"
-                    style={{ animation: `innoculus-shock 950ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
+                    style={{ animation: `innoculus-shock 1400ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
+                  <circle cx={pulse.cx + 3.5} cy={pulse.cy} r="10" fill="none"
+                    stroke="#ff7ac0"
+                    style={{ animation: `innoculus-shock 1400ms cubic-bezier(0.22,1,0.36,1) ${delay}ms forwards` }} />
                 </g>
               ))}
             </g>
