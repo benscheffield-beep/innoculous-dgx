@@ -86,89 +86,27 @@ export default function Tutorial() {
             <PipelineNode icon={Gem} name="Relic" role="preservation" tint="silver" />
           </div>
 
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
-            <div>
-              <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground mb-2">
-                Reckoner
-              </h4>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                The Reckoner receives the innoculant specification, plans the strategy, and dispatches
-                work to the Daemon. It is the only operator-facing entry point — the portal
-                you tap from the splash screen.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground mb-2">
-                Daemon
-              </h4>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                The Daemon performs the spectral self-force computations, evaluating
-                cutoff sweeps, and producing raw output.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground mb-2">
-                Judge
-              </h4>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                The Judge validates the Daemon's output against quality gates: closed-form
-                residuals, Mercer slope thresholds, Warburg <span className="font-mono">ν</span>{" "}
-                bounds, truncation error, and policy compliance.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground mb-2">
-                Relic
-              </h4>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                The verified result is sealed as a Relic — an immutable, queryable record
-                with diagnostics, payload, and verdict attached.
-              </p>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
-      {/* Innoculation phases */}
+      {/* Innoculation phases — descriptive prose stripped at user request;
+          the icon + title tiles remain as a compact visual key. */}
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Innoculation</CardTitle>
-          <CardDescription>
-            One run, two phases. Each innoculation executes both phases in parallel and seals
-            the merged result as a single relic.
-          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="p-4 rounded-md bg-black/30 border border-white/5">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              <h4 className="font-semibold text-sm uppercase tracking-wide">Spectral phase</h4>
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Numerical self-force evaluation at the configured kernel and truncation. Produces
-              residuals, slopes, and a sub-verdict.
-            </p>
+          <div className="p-4 rounded-md bg-black/30 border border-white/5 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-primary" />
+            <h4 className="font-semibold text-sm uppercase tracking-wide">Spectral phase</h4>
           </div>
-          <div className="p-4 rounded-md bg-black/30 border border-white/5">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-primary" />
-              <h4 className="font-semibold text-sm uppercase tracking-wide">Speculative phase</h4>
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Knowledge-cutoff trace probing the target model month-by-month and fitting a
-              changepoint to estimate its effective cutoff date.
-            </p>
+          <div className="p-4 rounded-md bg-black/30 border border-white/5 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-primary" />
+            <h4 className="font-semibold text-sm uppercase tracking-wide">Speculative phase</h4>
           </div>
-          <div className="md:col-span-2 p-4 rounded-md bg-primary/5 border border-primary/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Flame className="w-4 h-4 text-primary" />
-              <h4 className="font-semibold text-sm uppercase tracking-wide text-primary">Daemon chat</h4>
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Once a relic is sealed, the innoculant detail page exposes a Daemon — a model
-              persona conditioned on the relic's spectral and speculative outputs. Ask it
-              questions to explore the run; the conversation is ephemeral and never stored.
-            </p>
+          <div className="md:col-span-2 p-4 rounded-md bg-primary/5 border border-primary/20 flex items-center gap-2">
+            <Flame className="w-4 h-4 text-primary" />
+            <h4 className="font-semibold text-sm uppercase tracking-wide text-primary">Daemon chat</h4>
           </div>
         </CardContent>
       </Card>
