@@ -1,5 +1,5 @@
 import { useGetJobStats, getGetJobStatsQueryKey, useListJobs, getListJobsQueryKey } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { ArrowRight, BarChart3, Activity, AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
@@ -79,8 +79,7 @@ export default function Dashboard() {
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest trace jobs entering the pipeline.</CardDescription>
+            <CardTitle>Tracing</CardTitle>
           </div>
           <Link href="/jobs" className="text-sm text-primary hover:underline flex items-center gap-1">
             View All <ArrowRight className="w-4 h-4" />
