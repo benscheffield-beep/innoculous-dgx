@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { ArrowRight, Brain, Edit3, ShieldCheck, FileBox, BarChart3, Clock } from "lucide-react";
 import { InnoculusEmblem } from "@/components/innoculus-emblem";
@@ -169,42 +168,6 @@ export default function Tutorial() {
               Once a relic is sealed, the innoculant detail page exposes a Daemon — a model
               persona conditioned on the relic's spectral and speculative outputs. Ask it
               questions to explore the run; the conversation is ephemeral and never stored.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Verdicts */}
-      <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle>Verdicts</CardTitle>
-          <CardDescription>The qualitative status of relics.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-start gap-3">
-            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 mt-0.5">
-              Complete
-            </Badge>
-            <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-              All checks passed. The relic is trustworthy and ready for downstream use.
-            </p>
-          </div>
-          <div className="flex items-start gap-3">
-            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 mt-0.5">
-              Intermediate
-            </Badge>
-            <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-              The result is usable but one or more soft thresholds were crossed. Inspect
-              diagnostics before relying on it.
-            </p>
-          </div>
-          <div className="flex items-start gap-3">
-            <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 mt-0.5">
-              Failed
-            </Badge>
-            <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-              A hard check failed. The relic is not trustworthy. Review the failure
-              and retry from the job detail page.
             </p>
           </div>
         </CardContent>

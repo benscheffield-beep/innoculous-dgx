@@ -140,6 +140,42 @@ export default function Jobs() {
         </div>
       </div>
 
+      {/* Verdict legend — relocated from the tutorial. Describes the
+          qualitative state of each relic so the column meanings are
+          self-documenting without leaving this page. Operational states
+          (Queued / Running) are intentionally omitted since they are
+          not "verdicts" — they are pre-judgment lifecycle states. */}
+      <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
+        <CardContent className="p-4 grid gap-3 md:grid-cols-3">
+          <div className="flex items-start gap-3">
+            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 mt-0.5 shrink-0">
+              Complete
+            </Badge>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              All checks passed. The relic is trustworthy and ready for downstream use.
+            </p>
+          </div>
+          <div className="flex items-start gap-3">
+            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 mt-0.5 shrink-0">
+              Intermediate
+            </Badge>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Usable, but one or more soft thresholds were crossed. Inspect
+              diagnostics before relying on it.
+            </p>
+          </div>
+          <div className="flex items-start gap-3">
+            <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 mt-0.5 shrink-0">
+              Failed
+            </Badge>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              A hard check failed. The relic is not trustworthy — review the failure
+              and retry from the job detail page.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           {VERDICT_COLUMNS.map(col => (
