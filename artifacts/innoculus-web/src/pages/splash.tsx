@@ -1,13 +1,83 @@
 import { useLocation } from "wouter";
 import { useState } from "react";
 
+/**
+ * Speak the wordmark "Innoculus" using two voices (one female-leaning, one male-leaning)
+ * via the browser's built-in SpeechSynthesis API. Voices are queued back-to-back so the
+ * pair is heard as a quick duet. Falls back to pitch-only differentiation if no
+ * recognizable gendered voices are available. Speech persists across the SPA navigation.
+ */
+function speakInnoculus() {
+  if (typeof window === "undefined") return;
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+
+  const start = () => {
+    const voices = synth.getVoices();
+
+    const femaleHints = ["female", "woman", "samantha", "victoria", "karen", "zira", "susan", "tessa", "moira", "fiona", "allison", "ava", "serena"];
+    const maleHints = ["male", "man", "daniel", "alex", "fred", "david", "tom", "george", "oliver", "rishi", "arthur", "diego"];
+
+    const pickVoice = (hints: string[]): SpeechSynthesisVoice | undefined => {
+      const enVoices = voices.filter((v) => v.lang?.toLowerCase().startsWith("en"));
+      const pool = enVoices.length ? enVoices : voices;
+      return pool.find((v) => hints.some((h) => v.name.toLowerCase().includes(h)));
+    };
+
+    const femaleVoice = pickVoice(femaleHints);
+    const maleVoice = pickVoice(maleHints);
+
+    synth.cancel();
+
+    const word = "Innoculus";
+
+    const fem = new SpeechSynthesisUtterance(word);
+    if (femaleVoice) fem.voice = femaleVoice;
+    fem.pitch = femaleVoice ? 1.1 : 1.55;
+    fem.rate = 0.95;
+    fem.volume = 1;
+
+    const mas = new SpeechSynthesisUtterance(word);
+    if (maleVoice) mas.voice = maleVoice;
+    mas.pitch = maleVoice ? 0.95 : 0.55;
+    mas.rate = 0.95;
+    mas.volume = 1;
+
+    synth.speak(fem);
+    synth.speak(mas);
+  };
+
+  // Voices may load asynchronously on first use; wait once if needed.
+  if (synth.getVoices().length === 0) {
+    const handler = () => {
+      synth.removeEventListener("voiceschanged", handler);
+      start();
+    };
+    synth.addEventListener("voiceschanged", handler);
+    // Trigger voice loading in some browsers
+    synth.getVoices();
+    // Fallback: if voiceschanged never fires, attempt after a short delay
+    setTimeout(() => {
+      if (synth.getVoices().length > 0) {
+        synth.removeEventListener("voiceschanged", handler);
+        start();
+      }
+    }, 250);
+  } else {
+    start();
+  }
+}
+
 export default function Splash() {
   const [, navigate] = useLocation();
   const [hover, setHover] = useState(false);
 
   const [hoverTutorial, setHoverTutorial] = useState(false);
 
-  const handleEnter = () => navigate("/dashboard");
+  const handleEnter = () => {
+    speakInnoculus();
+    navigate("/dashboard");
+  };
   const handleTutorial = () => navigate("/tutorial");
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
