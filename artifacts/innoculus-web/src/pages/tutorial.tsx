@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { ArrowRight, Brain, Edit3, ShieldCheck, FileBox, Play, List, BarChart3, Clock } from "lucide-react";
+import { ArrowRight, Brain, Edit3, ShieldCheck, FileBox, List, BarChart3, Clock } from "lucide-react";
 import { InnoculusEmblem } from "@/components/innoculus-emblem";
 
 type MetalTint = "lead" | "copper" | "gold" | "silver";
@@ -209,7 +209,7 @@ export default function Tutorial() {
           <Step num="1" title="Initiate">
             Go to{" "}
             <Link href="/submit" className="text-primary hover:underline inline-flex items-center gap-1">
-              <Play className="w-3 h-3" /> Initiate Innoculants
+              <span className="inline-flex items-center justify-center w-3 h-3 text-xs leading-none font-serif">Θ</span> Initiate Innoculants
             </Link>{" "}
             and pick a tab — Spectral for a single evaluation, Speculative for a sweep.
             Fill the form and submit.
