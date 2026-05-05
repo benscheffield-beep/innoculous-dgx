@@ -861,68 +861,80 @@ export default function Splash() {
         </svg>
       </div>
 
-      {/* Daemon chat surface — the "sentence bar" + input that anchors below
-          the diagram. Hidden until the user clicks the central Daemon orb.
-          Width-matched to the diagram so it visually belongs to the widget. */}
+      {/* Daemon chat surface — a single unified glass panel that anchors
+          below the diagram. The transcript ("sentence bar") sits above a
+          hairline divider; the input row beneath shares the same surface
+          with no visible borders, so the whole thing reads as one
+          continuous aperture rather than two stacked cards. The outer
+          glow + border subtly intensify while the Daemon's voice plays. */}
       {chatOpen && (
         <div
-          className="relative z-10 mt-6 w-[min(560px,90vw)] flex flex-col gap-3"
+          className="relative z-10 mt-8 w-[min(560px,90vw)] rounded-2xl backdrop-blur-md transition-all duration-500"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(18,18,22,0.72) 0%, rgba(8,8,10,0.78) 100%)",
+            border: "1px solid",
+            borderColor: orbSpeaking ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.08)",
+            boxShadow: orbSpeaking
+              ? "0 0 48px rgba(255,255,255,0.14), 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)"
+              : "0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
+          }}
           data-testid="daemon-chat-surface"
           role="region"
           aria-label="Daemon chat"
         >
-          {/* Sentence bar — shows the Daemon's current spoken line. Pulses a
-              gentle outer glow while the voice is actually playing.
-              `aria-live=polite` so screen readers announce new transcripts. */}
+          {/* Close affordance — minimal, ghost-like; sits in the top-right
+              corner so it doesn't compete with the transcript. */}
+          <button
+            type="button"
+            onClick={closeDaemonChat}
+            aria-label="Close Daemon chat"
+            data-testid="button-daemon-close"
+            className="absolute top-3 right-3 text-white/30 hover:text-white/80 transition-colors p-1 rounded-full"
+          >
+            <X className="w-3 h-3" strokeWidth={1.5} />
+          </button>
+
+          {/* Transcript ("sentence bar"). aria-live=polite so screen readers
+              announce new Daemon utterances. */}
           <div
-            className="relative rounded-md border bg-black/60 px-4 py-3 backdrop-blur-sm transition-shadow duration-300"
-            style={{
-              borderColor: orbSpeaking ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.12)",
-              boxShadow: orbSpeaking
-                ? "0 0 24px rgba(255,255,255,0.18), inset 0 0 12px rgba(255,255,255,0.05)"
-                : "0 0 0 rgba(0,0,0,0)",
-            }}
+            className="px-6 pt-6 pb-5"
             data-testid="daemon-sentence-bar"
             data-speaking={orbSpeaking ? "true" : "false"}
           >
-            <button
-              type="button"
-              onClick={closeDaemonChat}
-              aria-label="Close Daemon chat"
-              data-testid="button-daemon-close"
-              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors p-1"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-            <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-mono mb-1 pr-6">
-              The Daemon
-            </div>
             <div
-              className="text-sm leading-relaxed text-white/90 whitespace-pre-wrap min-h-[1.5em] pr-6"
+              className="text-[15px] leading-[1.65] text-white/90 whitespace-pre-wrap min-h-[1.65em] font-light tracking-[0.005em] pr-6"
               data-testid="daemon-transcript"
               aria-live="polite"
               aria-atomic="true"
             >
               {chatPending && !transcript ? (
-                <span className="inline-flex items-center gap-2 text-white/60 italic">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> The Daemon is gathering itself…
+                <span className="inline-flex items-center gap-2.5 text-white/50 italic">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
+                  The Daemon is gathering itself…
                 </span>
               ) : chatError ? (
-                <span className="text-red-300/90">
+                <span className="text-red-300/85">
                   The Daemon is silent — {chatError}
                 </span>
               ) : transcript ? (
                 transcript
               ) : (
-                <span className="text-white/40 italic">
+                <span className="text-white/35 italic">
                   Speak, and the Daemon will answer.
                 </span>
               )}
             </div>
           </div>
 
-          {/* Input row */}
-          <div className="flex items-end gap-2">
+          {/* Hairline divider — a single 1px rule that splits the panel into
+              voice/transcript above and user input below. */}
+          <div className="h-px bg-white/[0.06]" />
+
+          {/* Input row — borderless, surface-flush. The send button is a
+              ghost icon at the trailing edge; no chrome beyond a soft
+              hover state, in keeping with the minimalist diagram aesthetic. */}
+          <div className="flex items-center gap-2 pl-6 pr-3 py-2">
             <textarea
               ref={inputElRef}
               value={chatInput}
@@ -933,10 +945,10 @@ export default function Splash() {
                   submitChatInput();
                 }
               }}
-              placeholder="Ask the Daemon… (Enter to send, Esc to close)"
+              placeholder="Ask the Daemon…"
               disabled={chatPending}
               data-testid="input-splash-daemon-message"
-              className="flex-1 min-h-[44px] max-h-[120px] resize-none rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:outline-none focus:border-white/30 disabled:opacity-60"
+              className="flex-1 min-h-[40px] max-h-[120px] resize-none bg-transparent border-0 px-0 py-2.5 text-[14px] leading-snug text-white/90 placeholder:text-white/30 placeholder:font-light focus:outline-none focus:ring-0 disabled:opacity-50 font-light tracking-[0.005em]"
               rows={1}
             />
             <button
@@ -944,13 +956,13 @@ export default function Splash() {
               onClick={submitChatInput}
               disabled={!chatInput.trim() || chatPending}
               data-testid="button-splash-daemon-send"
-              className="h-[44px] w-[44px] inline-flex items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/[0.06] active:bg-white/[0.10] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white/50"
               aria-label="Send to Daemon"
             >
               {chatPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
               ) : (
-                <Send className="w-4 h-4" />
+                <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
               )}
             </button>
           </div>
