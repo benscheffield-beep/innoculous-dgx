@@ -204,7 +204,7 @@ export default function Tutorial() {
           </Step>
           <Step num="3" title="Read the diagnostics">
             On the innoculant detail page you get the verdict, the artifact payload, and the full
-            diagnostic table. Toggle <span className="font-mono text-foreground">Dev Mode</span>{" "}
+            diagnostic table. Toggle <span className="font-mono text-foreground">Operator Mode</span>{" "}
             in the sidebar to reveal advanced metrics like the Warburg trio, truncation
             error, and policy fields.
           </Step>
@@ -214,7 +214,7 @@ export default function Tutorial() {
       {/* Modes */}
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle>User vs Developer Mode</CardTitle>
+          <CardTitle>User vs Operator Mode</CardTitle>
           <CardDescription>Toggle in the sidebar.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
@@ -226,7 +226,7 @@ export default function Tutorial() {
             </p>
           </div>
           <div className="p-4 rounded-md bg-black/30 border border-white/5">
-            <h4 className="font-semibold text-sm uppercase tracking-wide mb-2">Developer</h4>
+            <h4 className="font-semibold text-sm uppercase tracking-wide mb-2">Operator</h4>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Reveals every metric the Verifier emits, including the Warburg trio
               (residual, slope, ν), truncation error, and policy decisions.

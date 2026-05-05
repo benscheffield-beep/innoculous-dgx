@@ -72,7 +72,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center justify-between p-3 rounded-md bg-black/20 border border-white/5">
             <div className="flex items-center gap-2">
               <Settings className="w-4 h-4 text-muted-foreground" />
-              <Label htmlFor="mode-toggle" className="text-sm font-medium cursor-pointer">Dev Mode</Label>
+              <Label htmlFor="mode-toggle" className="text-sm font-medium cursor-pointer">Operator Mode</Label>
             </div>
             <Switch 
               id="mode-toggle"
