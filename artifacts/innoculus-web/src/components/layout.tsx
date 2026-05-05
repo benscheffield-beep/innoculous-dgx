@@ -2,9 +2,10 @@ import type React from "react";
 import { Link, useLocation } from "wouter";
 import { useMode } from "@/lib/mode-context";
 import { useHealthCheck, getHealthCheckQueryKey } from "@workspace/api-client-react";
-import { Activity, LayoutDashboard, List, Play, Settings } from "lucide-react";
+import { LayoutDashboard, List, Play, Settings } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { InnoculusEmblem } from "@/components/innoculus-emblem";
 
 function HealthIndicator() {
   const { data, isError } = useHealthCheck({
@@ -36,7 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border bg-card/50 flex flex-col">
         <div className="p-6 border-b border-border flex items-center justify-between md:justify-start gap-3">
           <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity" data-testid="link-home">
-            <Activity className="w-5 h-5" />
+            <InnoculusEmblem className="w-5 h-7" />
             <span className="font-bold tracking-tight text-lg">Innoculus</span>
           </Link>
           <div className="md:hidden">
