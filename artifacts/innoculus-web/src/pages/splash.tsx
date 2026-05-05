@@ -36,7 +36,7 @@ export default function Splash() {
         }}
       />
 
-      {/* Wordmark — corner so it doesn't crowd the Manager node */}
+      {/* Wordmark — corner so it doesn't crowd the Reckoner node */}
       <div className="absolute top-6 left-6 flex items-center gap-2 z-10" style={{ color: "rgba(255,255,255,0.78)" }}>
         <div
           className="w-1.5 h-1.5 rounded-full animate-[innoculus-blink_2.4s_ease-in-out_infinite]"

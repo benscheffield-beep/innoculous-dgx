@@ -61,11 +61,11 @@ export default function Tutorial() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-2">
-            <PipelineNode icon={Brain} name="Manager" role="orchestrates" />
+            <PipelineNode icon={Brain} name="Reckoner" role="orchestrates" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={Edit3} name="Editor" role="computes" />
+            <PipelineNode icon={Edit3} name="Daemon" role="computes" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
-            <PipelineNode icon={ShieldCheck} name="Verifier" role="checks" />
+            <PipelineNode icon={ShieldCheck} name="Judge" role="checks" />
             <ArrowRight className="hidden md:block w-5 h-5 text-muted-foreground/60 shrink-0" />
             <PipelineNode icon={FileBox} name="Artifact" role="emits" />
           </div>
@@ -73,29 +73,29 @@ export default function Tutorial() {
           <div className="mt-8 grid gap-6 md:grid-cols-2">
             <div>
               <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground mb-2">
-                Manager
+                Reckoner
               </h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                The Manager receives the innoculant specification, plans the strategy, and dispatches
-                work to the Editor. It is the only operator-facing entry point — the portal
+                The Reckoner receives the innoculant specification, plans the strategy, and dispatches
+                work to the Daemon. It is the only operator-facing entry point — the portal
                 you tap from the splash screen.
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground mb-2">
-                Editor
+                Daemon
               </h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                The Editor performs the numerical work — running spectral self-force
+                The Daemon performs the numerical work — running spectral self-force
                 computations, evaluating cutoff sweeps, and producing raw output.
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground mb-2">
-                Verifier
+                Judge
               </h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                The Verifier validates the Editor's output against quality gates: closed-form
+                The Judge validates the Daemon's output against quality gates: closed-form
                 residuals, Mercer slope thresholds, Warburg <span className="font-mono">ν</span>{" "}
                 bounds, truncation error, and policy compliance.
               </p>
@@ -147,7 +147,7 @@ export default function Tutorial() {
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Verdicts</CardTitle>
-          <CardDescription>What the Verifier can return.</CardDescription>
+          <CardDescription>What the Judge can return.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-start gap-3">
@@ -199,7 +199,7 @@ export default function Tutorial() {
             <Link href="/jobs" className="text-primary hover:underline inline-flex items-center gap-1">
               <List className="w-3 h-3" /> All Innoculations
             </Link>
-            . Click any row to see its live status — Queued, Editor Running, Verifying,
+            . Click any row to see its live status — Queued, Daemon Running, Judging,
             then a final verdict.
           </Step>
           <Step num="3" title="Read the diagnostics">
@@ -228,7 +228,7 @@ export default function Tutorial() {
           <div className="p-4 rounded-md bg-black/30 border border-white/5">
             <h4 className="font-semibold text-sm uppercase tracking-wide mb-2">Operator</h4>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Reveals every metric the Verifier emits, including the Warburg trio
+              Reveals every metric the Judge emits, including the Warburg trio
               (residual, slope, ν), truncation error, and policy decisions.
             </p>
           </div>

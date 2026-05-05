@@ -128,11 +128,16 @@ export default function JobDetail() {
           <div className="flex items-center justify-between relative">
             <div className="absolute left-0 top-1/2 w-full h-0.5 bg-white/5 -z-10 -translate-y-1/2"></div>
             
-            {["queued", "editor", "verifying", "complete"].map((step, i) => {
+            {([
+              { key: "queued", label: "queued" },
+              { key: "editor", label: "daemon" },
+              { key: "verifying", label: "judging" },
+              { key: "complete", label: "complete" },
+            ] as const).map(({ key, label }, i) => {
               const active = i <= stepIndex;
               const failedVerifying = job.status === "failed" && i === 2;
               return (
-                <div key={step} className="flex flex-col items-center gap-2 bg-card/80 px-2" data-testid={`step-${step}`}>
+                <div key={key} className="flex flex-col items-center gap-2 bg-card/80 px-2" data-testid={`step-${key}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${
                     failedVerifying ? 'bg-destructive/20 border-destructive text-destructive' :
                     active ? 'bg-primary/20 border-primary text-primary' : 'bg-background border-white/10 text-muted-foreground'
@@ -140,7 +145,7 @@ export default function JobDetail() {
                     {failedVerifying ? <XCircle className="w-4 h-4" /> : active ? <CheckCircle2 className="w-4 h-4" /> : <div className="w-2 h-2 rounded-full bg-current" />}
                   </div>
                   <span className={`text-xs uppercase font-mono tracking-wider ${active ? (failedVerifying ? 'text-destructive' : 'text-primary') : 'text-muted-foreground'}`}>
-                    {step}
+                    {label}
                   </span>
                 </div>
               );
