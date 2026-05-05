@@ -3,8 +3,10 @@ import { useChatWithDaemon } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDaemonVoice } from "@/lib/use-daemon-voice";
+import { DaemonOrb } from "@/components/daemon-orb";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -23,6 +25,10 @@ export function DaemonChat({ jobId }: DaemonChatProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const chat = useChatWithDaemon();
+  // The daemon's voice — the same pre-rendered "Daemon" clip used on the
+  // splash page — plays on every successful response, with the orb above
+  // pulsing in time with the audio amplitude.
+  const voice = useDaemonVoice();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -33,6 +39,9 @@ export function DaemonChat({ jobId }: DaemonChatProps) {
   const send = () => {
     const text = input.trim();
     if (!text || chat.isPending) return;
+    // Browser autoplay policy: the AudioContext must be created/resumed
+    // inside this click handler so `play()` works later from onSuccess.
+    voice.prime();
     const next: Msg[] = [...messages, { role: "user", content: text }];
     setMessages(next);
     setInput("");
@@ -41,6 +50,7 @@ export function DaemonChat({ jobId }: DaemonChatProps) {
       {
         onSuccess: (resp) => {
           setMessages((prev) => [...prev, { role: "assistant", content: resp.content }]);
+          voice.play();
         },
         onError: (err: unknown) => {
           // Roll back the optimistically-added user turn so they can retry.
@@ -63,13 +73,21 @@ export function DaemonChat({ jobId }: DaemonChatProps) {
   return (
     <Card className="bg-card/50 border-white/5 backdrop-blur-sm" data-testid="card-daemon-chat">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          Daemon
-        </CardTitle>
-        <CardDescription>
-          Conditioned on this relic. Conversation is ephemeral — it lives only in this tab.
-        </CardDescription>
+        <div className="flex items-start gap-4">
+          <div className="shrink-0 -mt-1">
+            <DaemonOrb
+              subscribeLevel={voice.subscribeLevel}
+              isSpeaking={voice.isSpeaking}
+              size={64}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <CardTitle>Daemon</CardTitle>
+            <CardDescription className="mt-1">
+              Conditioned on this relic. Conversation is ephemeral — it lives only in this tab.
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div
