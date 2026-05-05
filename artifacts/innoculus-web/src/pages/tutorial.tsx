@@ -197,7 +197,7 @@ export default function Tutorial() {
           <Step num="2" title="Watch it move through the pipeline">
             The job appears under{" "}
             <Link href="/jobs" className="text-primary hover:underline inline-flex items-center gap-1">
-              <List className="w-3 h-3" /> All Jobs
+              <List className="w-3 h-3" /> All Innoculations
             </Link>
             . Click any row to see its live status — Queued, Editor Running, Verifying,
             then a final verdict.
