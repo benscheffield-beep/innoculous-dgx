@@ -170,6 +170,13 @@ export default function Splash() {
               className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]" />
             <circle cx="200" cy="220" r="6" fill="#e6e9ec" filter="url(#ic-soft-glow)" />
           </g>
+          {/* Center interior — the heart of the lens */}
+          <g>
+            <circle cx="200" cy="360" r="26" fill="url(#ic-node-glow-soft)"
+              className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]"
+              style={{ animationDelay: "0.6s" }} />
+            <circle cx="200" cy="360" r="7" fill="#f0f3f6" filter="url(#ic-soft-glow)" />
+          </g>
           {/* Lower interior */}
           <g>
             <circle cx="200" cy="500" r="22" fill="url(#ic-node-glow-soft)"
