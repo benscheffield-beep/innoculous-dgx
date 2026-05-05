@@ -50,6 +50,22 @@ export const createJobBodyTwoPolicyConfigMinRecheckCountDefault = 3;
 export const createJobBodyTwoPolicyConfigWarburgResidualTolDefault = 0.05;
 export const createJobBodyTwoPolicyConfigWarburgResidualTolMin = 0;
 
+export const createJobBodyThreeCutoffTraceJudgeTemperatureDefault = 0;
+export const createJobBodyThreePolicyConfigSpectralRadiusMaxDefault = 0.999;
+export const createJobBodyThreePolicyConfigCondLimitDefault = 1000000;
+export const createJobBodyThreePolicyConfigDualErrorTolDefault = 0.000001;
+export const createJobBodyThreePolicyConfigSpectralTailTolDefault = 0.000001;
+export const createJobBodyThreePolicyConfigJudgeDisagreementMaxDefault = 0.34;
+export const createJobBodyThreePolicyConfigJudgeDisagreementMaxMin = 0;
+export const createJobBodyThreePolicyConfigJudgeDisagreementMaxMax = 1;
+
+export const createJobBodyThreePolicyConfigMinProbesPerMonthDefault = 2;
+
+export const createJobBodyThreePolicyConfigMinRecheckCountDefault = 3;
+
+export const createJobBodyThreePolicyConfigWarburgResidualTolDefault = 0.05;
+export const createJobBodyThreePolicyConfigWarburgResidualTolMin = 0;
+
 export const CreateJobBody = zod.union([
   zod.object({
     kind: zod
@@ -213,14 +229,119 @@ export const CreateJobBody = zod.union([
         "Per-job policy thresholds. The numerical fields apply to the numerical\nEditor\/Verifier; the cutoff_\* fields apply to the cutoff_trace Verifier.\nPer-job values override defaults.\n",
       ),
   }),
+  zod
+    .object({
+      kind: zod.enum(["innoculation"]),
+      job_id: zod.string().uuid().optional(),
+      numerical: zod.object({
+        kernel: zod.object({
+          type: zod.enum(["gaussian", "mellin"]),
+          sigma: zod.number().optional(),
+          alpha: zod.number().optional(),
+        }),
+        Q: zod.array(zod.array(zod.number())),
+        truncation: zod.object({
+          M: zod.number(),
+          r: zod.number(),
+        }),
+        latency: zod.object({
+          lambda: zod.number(),
+          delta: zod.number(),
+          Tnow: zod.number(),
+        }),
+        precision: zod.object({
+          b: zod.number(),
+          tol: zod.number(),
+          safety_margin: zod.number().optional(),
+        }),
+        model_pool: zod
+          .array(zod.record(zod.string(), zod.unknown()))
+          .optional(),
+      }),
+      cutoff_trace: zod.object({
+        model: zod.string(),
+        judge_model: zod.string(),
+        judge_temperature: zod
+          .number()
+          .default(createJobBodyThreeCutoffTraceJudgeTemperatureDefault),
+        probes: zod
+          .array(
+            zod.object({
+              question: zod.string(),
+              answer: zod
+                .string()
+                .describe(
+                  "Ground-truth answer for the LLM-as-judge to compare against",
+                ),
+              date: zod
+                .string()
+                .describe(
+                  "Real-world publication \/ event date in YYYY-MM-DD form",
+                ),
+            }),
+          )
+          .min(1),
+      }),
+      policy_config: zod
+        .object({
+          spectral_radius_max: zod
+            .number()
+            .default(createJobBodyThreePolicyConfigSpectralRadiusMaxDefault),
+          cond_limit: zod
+            .number()
+            .default(createJobBodyThreePolicyConfigCondLimitDefault),
+          dual_error_tol: zod
+            .number()
+            .default(createJobBodyThreePolicyConfigDualErrorTolDefault),
+          spectral_tail_tol: zod
+            .number()
+            .default(createJobBodyThreePolicyConfigSpectralTailTolDefault),
+          judge_disagreement_max: zod
+            .number()
+            .min(createJobBodyThreePolicyConfigJudgeDisagreementMaxMin)
+            .max(createJobBodyThreePolicyConfigJudgeDisagreementMaxMax)
+            .default(createJobBodyThreePolicyConfigJudgeDisagreementMaxDefault)
+            .describe(
+              "cutoff_trace CT02 — max allowed judge spot-recheck disagreement rate",
+            ),
+          min_probes_per_month: zod
+            .number()
+            .min(1)
+            .default(createJobBodyThreePolicyConfigMinProbesPerMonthDefault)
+            .describe(
+              "cutoff_trace CT04 — minimum probes required per YYYY-MM bin",
+            ),
+          min_recheck_count: zod
+            .number()
+            .min(1)
+            .default(createJobBodyThreePolicyConfigMinRecheckCountDefault)
+            .describe(
+              "cutoff_trace CT02 — minimum number of probes spot-rechecked",
+            ),
+          warburg_residual_tol: zod
+            .number()
+            .min(createJobBodyThreePolicyConfigWarburgResidualTolMin)
+            .default(createJobBodyThreePolicyConfigWarburgResidualTolDefault)
+            .describe(
+              "numerical CHK08 — max relative ||F − F̃||\/||F̃|| against the closed-form Warburg oracle",
+            ),
+        })
+        .optional()
+        .describe(
+          "Per-job policy thresholds. The numerical fields apply to the numerical\nEditor\/Verifier; the cutoff_\* fields apply to the cutoff_trace Verifier.\nPer-job values override defaults.\n",
+        ),
+    })
+    .describe(
+      "Unified Innoculation job. Runs both the Spectral (numerical) and\nSpeculative (cutoff_trace) editors and merges their outputs into\none relic that the Daemon can be conditioned on.\n",
+    ),
 ]);
 
 export const CreateJobResponse = zod.object({
   id: zod.string().uuid(),
   kind: zod
-    .enum(["numerical", "cutoff_trace"])
+    .enum(["numerical", "cutoff_trace", "innoculation"])
     .describe(
-      "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+      "Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.",
     ),
   status: zod.enum([
     "queued",
@@ -243,7 +364,7 @@ export const CreateJobResponse = zod.object({
 });
 
 /**
- * Returns a paginated list of all jobs
+ * Returns a paginated list of all jobs. Use `kind` to filter to a single job kind (e.g. only `innoculation` for the modern UI).
  * @summary List all jobs
  */
 export const listJobsQueryPageDefault = 1;
@@ -252,6 +373,10 @@ export const listJobsQueryPageSizeDefault = 20;
 export const ListJobsQueryParams = zod.object({
   page: zod.coerce.number().default(listJobsQueryPageDefault),
   page_size: zod.coerce.number().default(listJobsQueryPageSizeDefault),
+  kind: zod
+    .enum(["numerical", "cutoff_trace", "innoculation"])
+    .optional()
+    .describe("Optional. When provided, only jobs of this kind are returned."),
 });
 
 export const ListJobsResponse = zod.object({
@@ -259,9 +384,9 @@ export const ListJobsResponse = zod.object({
     zod.object({
       id: zod.string().uuid(),
       kind: zod
-        .enum(["numerical", "cutoff_trace"])
+        .enum(["numerical", "cutoff_trace", "innoculation"])
         .describe(
-          "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+          "Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.",
         ),
       status: zod.enum([
         "queued",
@@ -302,13 +427,19 @@ export const getJobResponseTwoArtifactPayloadTwoProbeResultsItemJudgeScoreMax = 
 export const getJobResponseTwoArtifactPayloadTwoMonthlyAggregatesItemKnewRateMin = 0;
 export const getJobResponseTwoArtifactPayloadTwoMonthlyAggregatesItemKnewRateMax = 1;
 
+export const getJobResponseTwoArtifactPayloadThreeCutoffTraceProbeResultsItemJudgeScoreMin = 0;
+export const getJobResponseTwoArtifactPayloadThreeCutoffTraceProbeResultsItemJudgeScoreMax = 1;
+
+export const getJobResponseTwoArtifactPayloadThreeCutoffTraceMonthlyAggregatesItemKnewRateMin = 0;
+export const getJobResponseTwoArtifactPayloadThreeCutoffTraceMonthlyAggregatesItemKnewRateMax = 1;
+
 export const GetJobResponse = zod
   .object({
     id: zod.string().uuid(),
     kind: zod
-      .enum(["numerical", "cutoff_trace"])
+      .enum(["numerical", "cutoff_trace", "innoculation"])
       .describe(
-        "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+        "Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.",
       ),
     status: zod.enum([
       "queued",
@@ -388,6 +519,73 @@ export const GetJobResponse = zod
                   ),
               }),
             }),
+            zod
+              .object({
+                kind: zod.enum(["innoculation"]),
+                verdict: zod.enum(["pass", "warn", "fail"]),
+                sub_verdicts: zod.object({
+                  numerical: zod.enum(["pass", "warn", "fail"]),
+                  cutoff_trace: zod.enum(["pass", "warn", "fail"]),
+                }),
+                numerical: zod
+                  .record(zod.string(), zod.unknown())
+                  .describe(
+                    "Numerical pipeline artifact (kernel coefficients, diagnostics, spectral data).",
+                  ),
+                cutoff_trace: zod.object({
+                  kind: zod.enum(["cutoff_trace"]),
+                  model: zod.string(),
+                  judge_model: zod.string(),
+                  probe_results: zod.array(
+                    zod.object({
+                      question: zod.string(),
+                      answer: zod.string(),
+                      date: zod.string(),
+                      model_answer: zod.string(),
+                      judge_score: zod
+                        .number()
+                        .min(
+                          getJobResponseTwoArtifactPayloadThreeCutoffTraceProbeResultsItemJudgeScoreMin,
+                        )
+                        .max(
+                          getJobResponseTwoArtifactPayloadThreeCutoffTraceProbeResultsItemJudgeScoreMax,
+                        ),
+                      judge_reasoning: zod.string(),
+                    }),
+                  ),
+                  monthly_aggregates: zod.array(
+                    zod.object({
+                      month: zod.string().describe("YYYY-MM"),
+                      n: zod.number(),
+                      knew_rate: zod
+                        .number()
+                        .min(
+                          getJobResponseTwoArtifactPayloadThreeCutoffTraceMonthlyAggregatesItemKnewRateMin,
+                        )
+                        .max(
+                          getJobResponseTwoArtifactPayloadThreeCutoffTraceMonthlyAggregatesItemKnewRateMax,
+                        ),
+                    }),
+                  ),
+                  cutoff_estimate: zod.object({
+                    month: zod.string().describe("YYYY-MM"),
+                    ci_low: zod
+                      .string()
+                      .describe("YYYY-MM (95% CI lower bound)"),
+                    ci_high: zod
+                      .string()
+                      .describe("YYYY-MM (95% CI upper bound)"),
+                    fit_quality: zod
+                      .number()
+                      .describe(
+                        "McFadden pseudo-R² of the logistic changepoint fit",
+                      ),
+                  }),
+                }),
+              })
+              .describe(
+                "Unified relic carrying both Spectral and Speculative sub-payloads plus a unified verdict and per-phase sub-verdicts.",
+              ),
           ]),
           hash: zod.string(),
           signed_proof: zod.string().nullish(),
@@ -459,9 +657,9 @@ export const PatchJobStatusBody = zod.object({
 export const PatchJobStatusResponse = zod.object({
   id: zod.string().uuid(),
   kind: zod
-    .enum(["numerical", "cutoff_trace"])
+    .enum(["numerical", "cutoff_trace", "innoculation"])
     .describe(
-      "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+      "Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.",
     ),
   status: zod.enum([
     "queued",
@@ -501,6 +699,12 @@ export const putJobArtifactResponsePayloadTwoProbeResultsItemJudgeScoreMax = 1;
 
 export const putJobArtifactResponsePayloadTwoMonthlyAggregatesItemKnewRateMin = 0;
 export const putJobArtifactResponsePayloadTwoMonthlyAggregatesItemKnewRateMax = 1;
+
+export const putJobArtifactResponsePayloadThreeCutoffTraceProbeResultsItemJudgeScoreMin = 0;
+export const putJobArtifactResponsePayloadThreeCutoffTraceProbeResultsItemJudgeScoreMax = 1;
+
+export const putJobArtifactResponsePayloadThreeCutoffTraceMonthlyAggregatesItemKnewRateMin = 0;
+export const putJobArtifactResponsePayloadThreeCutoffTraceMonthlyAggregatesItemKnewRateMax = 1;
 
 export const PutJobArtifactResponse = zod.object({
   id: zod.string().uuid(),
@@ -552,6 +756,67 @@ export const PutJobArtifactResponse = zod.object({
           .describe("McFadden pseudo-R² of the logistic changepoint fit"),
       }),
     }),
+    zod
+      .object({
+        kind: zod.enum(["innoculation"]),
+        verdict: zod.enum(["pass", "warn", "fail"]),
+        sub_verdicts: zod.object({
+          numerical: zod.enum(["pass", "warn", "fail"]),
+          cutoff_trace: zod.enum(["pass", "warn", "fail"]),
+        }),
+        numerical: zod
+          .record(zod.string(), zod.unknown())
+          .describe(
+            "Numerical pipeline artifact (kernel coefficients, diagnostics, spectral data).",
+          ),
+        cutoff_trace: zod.object({
+          kind: zod.enum(["cutoff_trace"]),
+          model: zod.string(),
+          judge_model: zod.string(),
+          probe_results: zod.array(
+            zod.object({
+              question: zod.string(),
+              answer: zod.string(),
+              date: zod.string(),
+              model_answer: zod.string(),
+              judge_score: zod
+                .number()
+                .min(
+                  putJobArtifactResponsePayloadThreeCutoffTraceProbeResultsItemJudgeScoreMin,
+                )
+                .max(
+                  putJobArtifactResponsePayloadThreeCutoffTraceProbeResultsItemJudgeScoreMax,
+                ),
+              judge_reasoning: zod.string(),
+            }),
+          ),
+          monthly_aggregates: zod.array(
+            zod.object({
+              month: zod.string().describe("YYYY-MM"),
+              n: zod.number(),
+              knew_rate: zod
+                .number()
+                .min(
+                  putJobArtifactResponsePayloadThreeCutoffTraceMonthlyAggregatesItemKnewRateMin,
+                )
+                .max(
+                  putJobArtifactResponsePayloadThreeCutoffTraceMonthlyAggregatesItemKnewRateMax,
+                ),
+            }),
+          ),
+          cutoff_estimate: zod.object({
+            month: zod.string().describe("YYYY-MM"),
+            ci_low: zod.string().describe("YYYY-MM (95% CI lower bound)"),
+            ci_high: zod.string().describe("YYYY-MM (95% CI upper bound)"),
+            fit_quality: zod
+              .number()
+              .describe("McFadden pseudo-R² of the logistic changepoint fit"),
+          }),
+        }),
+      })
+      .describe(
+        "Unified relic carrying both Spectral and Speculative sub-payloads plus a unified verdict and per-phase sub-verdicts.",
+      ),
   ]),
   hash: zod.string(),
   signed_proof: zod.string().nullish(),
@@ -618,9 +883,9 @@ export const PostJobVerdictBody = zod.object({
 export const PostJobVerdictResponse = zod.object({
   id: zod.string().uuid(),
   kind: zod
-    .enum(["numerical", "cutoff_trace"])
+    .enum(["numerical", "cutoff_trace", "innoculation"])
     .describe(
-      "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+      "Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.",
     ),
   status: zod.enum([
     "queued",
@@ -653,9 +918,9 @@ export const RetryJobParams = zod.object({
 export const RetryJobResponse = zod.object({
   id: zod.string().uuid(),
   kind: zod
-    .enum(["numerical", "cutoff_trace"])
+    .enum(["numerical", "cutoff_trace", "innoculation"])
     .describe(
-      "Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.",
+      "Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.",
     ),
   status: zod.enum([
     "queued",
@@ -675,6 +940,39 @@ export const RetryJobResponse = zod.object({
   retry_count: zod.number(),
   created_at: zod.coerce.date(),
   updated_at: zod.coerce.date(),
+});
+
+/**
+ * The Daemon is an LLM persona conditioned on the relic produced by an
+`innoculation` job (Spectral + Speculative outputs). Stateless: clients
+send the full message history every call; nothing is persisted server-side.
+
+ * @summary Send a chat turn to the relic's Daemon
+ */
+export const ChatWithDaemonParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const ChatWithDaemonBody = zod.object({
+  messages: zod
+    .array(
+      zod.object({
+        role: zod.enum(["user", "assistant"]),
+        content: zod.string(),
+      }),
+    )
+    .min(1),
+  model: zod
+    .string()
+    .optional()
+    .describe(
+      "Optional override of the Daemon model. Defaults to the server's configured model.",
+    ),
+});
+
+export const ChatWithDaemonResponse = zod.object({
+  content: zod.string(),
+  model: zod.string(),
 });
 
 /**

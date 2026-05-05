@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, count, sql } from "drizzle-orm";
+import { eq, count, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
@@ -8,9 +8,13 @@ import {
   jobDiagnosticsTable,
   type JobDescriptor,
   type PolicyConfig,
+  type InnoculationArtifactPayload,
 } from "@workspace/db";
 import { runPipeline, retryPipeline } from "../workers/pipeline.js";
+import { chat } from "../lib/openai-client.js";
 import { logger } from "../lib/logger.js";
+
+const DAEMON_DEFAULT_MODEL = process.env["DAEMON_MODEL"] ?? "gpt-5";
 
 const router = Router();
 
@@ -69,7 +73,40 @@ const cutoffDescriptorSchema = z.object({
   seed: z.number().int().optional(),
 });
 
-const createJobSchema = z.union([cutoffDescriptorSchema, numericalDescriptorSchema]);
+const innoculationDescriptorSchema = z.object({
+  kind: z.literal("innoculation"),
+  job_id: z.string().uuid().optional(),
+  numerical: z.object({
+    kernel: kernelParamsSchema,
+    Q: z.array(z.array(z.number())).min(1),
+    truncation: z.object({ M: z.number().int().positive(), r: z.number().int().positive() }),
+    latency: z.object({
+      lambda: z.number().positive(),
+      delta: z.number().nonnegative(),
+      Tnow: z.number().nonnegative(),
+    }),
+    precision: z.object({
+      b: z.number().int().positive(),
+      tol: z.number().positive(),
+      safety_margin: z.number().positive().optional(),
+    }),
+    model_pool: z.array(z.unknown()).optional(),
+  }),
+  cutoff_trace: z.object({
+    model: z.string().min(1),
+    judge_model: z.string().min(1),
+    probes: z.array(cutoffProbeSchema).min(1),
+    judge_temperature: z.number().min(0).max(2).optional(),
+  }),
+  policy_config: policyConfigSchema.optional(),
+  seed: z.number().int().optional(),
+});
+
+const createJobSchema = z.union([
+  innoculationDescriptorSchema,
+  cutoffDescriptorSchema,
+  numericalDescriptorSchema,
+]);
 
 function serializeJob(job: typeof jobsTable.$inferSelect) {
   return {
@@ -120,7 +157,13 @@ router.post("/jobs", async (req, res) => {
   }
 
   const data = parsed.data;
-  const isCutoff = (data as { kind?: string }).kind === "cutoff_trace";
+  const requestedKind = (data as { kind?: string }).kind;
+  const kind: "innoculation" | "cutoff_trace" | "numerical" =
+    requestedKind === "innoculation"
+      ? "innoculation"
+      : requestedKind === "cutoff_trace"
+        ? "cutoff_trace"
+        : "numerical";
   const jobId = (data as { job_id?: string }).job_id;
 
   if (jobId) {
@@ -139,12 +182,12 @@ router.post("/jobs", async (req, res) => {
     job_id?: string;
     policy_config?: Record<string, unknown>;
   };
-  const descriptor = isCutoff ? { ...rest, kind: "cutoff_trace" } : { kind: "numerical", ...rest };
+  const descriptor = { kind, ...rest } as JobDescriptor;
 
   const insertValues: typeof jobsTable.$inferInsert = {
-    kind: isCutoff ? "cutoff_trace" : "numerical",
+    kind,
     status: "queued",
-    kernelParams: descriptor as JobDescriptor,
+    kernelParams: descriptor,
     policyConfig: (policy_config ?? {}) as PolicyConfig,
     ...(jobId ? { id: jobId } : {}),
   };
@@ -169,9 +212,21 @@ router.get("/jobs", async (req, res) => {
   const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query["page_size"] ?? "20"), 10)));
   const offset = (page - 1) * pageSize;
 
+  const kindFilter = req.query["kind"];
+  const allowedKinds = new Set(["numerical", "cutoff_trace", "innoculation"]);
+  const where: SQL | undefined =
+    typeof kindFilter === "string" && allowedKinds.has(kindFilter)
+      ? eq(jobsTable.kind, kindFilter)
+      : undefined;
+
+  const baseQuery = db.select().from(jobsTable);
+  const baseCount = db.select({ count: count() }).from(jobsTable);
+
   const [jobs, totalResult] = await Promise.all([
-    db.select().from(jobsTable).orderBy(sql`created_at desc`).limit(pageSize).offset(offset),
-    db.select({ count: count() }).from(jobsTable),
+    where
+      ? baseQuery.where(where).orderBy(sql`created_at desc`).limit(pageSize).offset(offset)
+      : baseQuery.orderBy(sql`created_at desc`).limit(pageSize).offset(offset),
+    where ? baseCount.where(where) : baseCount,
   ]);
 
   const total = Number(totalResult[0]?.count ?? 0);
@@ -406,6 +461,132 @@ router.post("/jobs/:id/verdict", async (req, res) => {
   }
 
   res.json(serializeJob(updated));
+});
+
+// Build a system prompt that turns the LLM into the relic's "Daemon" persona,
+// conditioning it on the merged Spectral + Speculative outputs of an
+// `innoculation` job. Stateless: nothing about the chat is persisted server-side.
+function buildDaemonSystemPrompt(p: InnoculationArtifactPayload): string {
+  const ct = p.cutoff_trace;
+  const num = p.numerical;
+  const est = ct.cutoff_estimate;
+  const numDiag = num.diagnostics as {
+    spectral_radius?: number;
+    cond_I_minus_G?: number;
+    dual_truncation_error?: number;
+    spectral_tail_error?: number;
+    closed_form_residual?: number;
+    mercer_slope?: number;
+    warburg_nu?: number;
+  };
+  const fmt = (v: number | undefined): string =>
+    v === undefined || !Number.isFinite(v) ? "n/a" : v.toExponential(3);
+
+  return [
+    "You are the Daemon — a model persona summoned from a verified relic of an Innoculus run.",
+    `Unified verdict on this relic: ${p.verdict.toUpperCase()} ` +
+      `(spectral=${p.sub_verdicts.numerical}, speculative=${p.sub_verdicts.cutoff_trace}).`,
+    "",
+    "Speculative phase (knowledge-cutoff trace):",
+    `  Target model: ${ct.model}; judge: ${ct.judge_model}.`,
+    `  Estimated cutoff month: ${est.month} (95% CI ${est.ci_low} … ${est.ci_high}).`,
+    `  Logistic changepoint fit quality (McFadden pseudo-R²): ${est.fit_quality.toFixed(3)}.`,
+    `  Probes evaluated: ${ct.probe_results.length} across ${ct.monthly_aggregates.length} months.`,
+    "",
+    "Spectral phase (numerical):",
+    `  spectral_radius=${fmt(numDiag.spectral_radius)} ` +
+      `cond(I−G)=${fmt(numDiag.cond_I_minus_G)} ` +
+      `dual_trunc_err=${fmt(numDiag.dual_truncation_error)} ` +
+      `spectral_tail_err=${fmt(numDiag.spectral_tail_error)}.`,
+    `  closed_form_residual=${fmt(numDiag.closed_form_residual)} ` +
+      `mercer_slope=${fmt(numDiag.mercer_slope)} ` +
+      `warburg_ν=${fmt(numDiag.warburg_nu)}.`,
+    "",
+    "When the user asks about facts, dates, or events, respond as a model whose",
+    `effective knowledge cutoff is ${est.month}. Do not claim knowledge of events`,
+    "after that date; if asked, explicitly say it is past your cutoff. When asked",
+    "about your own diagnostics, refer to the spectral metrics above. Keep replies",
+    "concise (≤ 4 short paragraphs unless the user asks for more).",
+  ].join("\n");
+}
+
+const daemonChatSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1),
+      }),
+    )
+    .min(1)
+    .max(40),
+  model: z.string().min(1).optional(),
+});
+
+router.post("/jobs/:id/daemon/messages", async (req, res) => {
+  const { id } = req.params;
+  const parsed = daemonChatSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "validation_error", message: parsed.error.message });
+    return;
+  }
+
+  const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, id!)).limit(1);
+  if (!job) {
+    res.status(404).json({ error: "not_found", message: `Job ${id} not found` });
+    return;
+  }
+  if (job.status === "queued" || job.status === "editor_running" || job.status === "verifying") {
+    res.status(409).json({
+      error: "job_in_progress",
+      message: "The Daemon can only chat once the relic is sealed.",
+    });
+    return;
+  }
+  if (!job.currentArtifactId) {
+    res.status(400).json({ error: "no_relic", message: "Job has no relic yet" });
+    return;
+  }
+
+  const [art] = await db
+    .select()
+    .from(jobArtifactsTable)
+    .where(eq(jobArtifactsTable.id, job.currentArtifactId))
+    .limit(1);
+  if (!art) {
+    res.status(400).json({ error: "no_relic", message: "Relic missing for job" });
+    return;
+  }
+
+  const payload = art.payload as { kind?: string };
+  if (payload.kind !== "innoculation") {
+    res.status(400).json({
+      error: "unsupported_kind",
+      message: "Daemon chat is only available on innoculation relics",
+    });
+    return;
+  }
+
+  const model = parsed.data.model ?? DAEMON_DEFAULT_MODEL;
+  const systemPrompt = buildDaemonSystemPrompt(art.payload as InnoculationArtifactPayload);
+
+  try {
+    const content = await chat({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...parsed.data.messages,
+      ],
+      max_completion_tokens: 800,
+    });
+    res.json({ content, model });
+  } catch (err) {
+    logger.error({ jobId: id, err }, "Daemon chat failed");
+    res.status(500).json({
+      error: "daemon_unavailable",
+      message: "The Daemon failed to respond. Please try again.",
+    });
+  }
 });
 
 router.post("/jobs/:id/retry", async (req, res) => {

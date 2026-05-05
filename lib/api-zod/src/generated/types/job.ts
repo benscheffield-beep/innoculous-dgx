@@ -12,7 +12,7 @@ import type { JobStatus } from "./jobStatus";
 
 export interface Job {
   id: string;
-  /** Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing. */
+  /** Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic. */
   kind: JobKind;
   status: JobStatus;
   /** Job descriptor (numerical kernel params, or cutoff_trace probe specification). */

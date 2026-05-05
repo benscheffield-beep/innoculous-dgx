@@ -130,31 +130,45 @@ export default function Tutorial() {
         </CardContent>
       </Card>
 
-      {/* Innoculants */}
+      {/* Innoculation phases */}
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle>Innoculants</CardTitle>
-          <CardDescription>A discrete or continuous innoculation to execute.</CardDescription>
+          <CardTitle>Innoculation</CardTitle>
+          <CardDescription>
+            One run, two phases. Each innoculation executes both phases in parallel and seals
+            the merged result as a single relic.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="p-4 rounded-md bg-black/30 border border-white/5">
             <div className="flex items-center gap-2 mb-2">
               <BarChart3 className="w-4 h-4 text-primary" />
-              <h4 className="font-semibold text-sm uppercase tracking-wide">Spectral</h4>
+              <h4 className="font-semibold text-sm uppercase tracking-wide">Spectral phase</h4>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              A single spectral self-force evaluation at a fixed configuration. Returns
-              residual, slope, and a verdict.
+              Numerical self-force evaluation at the configured kernel and truncation. Produces
+              residuals, slopes, and a sub-verdict.
             </p>
           </div>
           <div className="p-4 rounded-md bg-black/30 border border-white/5">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-primary" />
-              <h4 className="font-semibold text-sm uppercase tracking-wide">Speculative</h4>
+              <h4 className="font-semibold text-sm uppercase tracking-wide">Speculative phase</h4>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              A sweep across cutoff values, producing a trace that lets you visualize
-              convergence and locate the elbow.
+              Knowledge-cutoff trace probing the target model month-by-month and fitting a
+              changepoint to estimate its effective cutoff date.
+            </p>
+          </div>
+          <div className="md:col-span-2 p-4 rounded-md bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Brain className="w-4 h-4 text-primary" />
+              <h4 className="font-semibold text-sm uppercase tracking-wide text-primary">Daemon chat</h4>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Once a relic is sealed, the innoculant detail page exposes a Daemon — a model
+              persona conditioned on the relic's spectral and speculative outputs. Ask it
+              questions to explore the run; the conversation is ephemeral and never stored.
             </p>
           </div>
         </CardContent>
@@ -208,22 +222,22 @@ export default function Tutorial() {
             <Link href="/submit" className="text-primary hover:underline inline-flex items-center gap-1">
               <span className="inline-flex items-center justify-center w-3 h-3 text-xs leading-none font-serif">Θ</span> Initiate Innoculants
             </Link>{" "}
-            and pick a tab — Spectral for a single evaluation, Speculative for a sweep.
-            Fill the form and submit.
+            and fill in both the Spectral and Speculative sections. A single submission
+            launches both phases.
           </Step>
           <Step num="2" title="Observe">
-            The innoculant appears under{" "}
+            The innoculation appears under{" "}
             <Link href="/jobs" className="text-primary hover:underline inline-flex items-center gap-1">
               <span className="inline-flex items-center justify-center w-3 h-3 text-xs leading-none font-serif">Σ</span> All Innoculations
             </Link>
-            . Click any row to see its live status — Queued, Daemon Running, Judging,
-            then a final verdict.
+            . Click any row to watch its live status — Queued, Daemon Running, Judging,
+            then a unified verdict with per-phase sub-verdicts.
           </Step>
-          <Step num="3" title="Retrieve">
-            On the innoculant detail page you get the verdict, the relic payload, and the full
-            diagnostic table. Toggle <span className="font-mono text-foreground">Operator Mode</span>{" "}
-            in the sidebar to reveal advanced metrics like the Warburg trio, truncation
-            error, and policy fields.
+          <Step num="3" title="Retrieve & converse">
+            On the innoculant detail page you get the unified verdict, the merged relic, the
+            full diagnostic table, and a Daemon chat panel — a model persona conditioned on
+            the relic. Toggle <span className="font-mono text-foreground">Operator Mode</span>{" "}
+            in the sidebar to reveal advanced metrics.
           </Step>
         </CardContent>
       </Card>

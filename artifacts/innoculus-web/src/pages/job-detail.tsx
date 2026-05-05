@@ -1,24 +1,152 @@
 import { useParams, Link } from "wouter";
-import { useGetJob, getGetJobQueryKey, useRetryJob, getListJobsQueryKey, getGetJobStatsQueryKey, CutoffArtifactPayload, NumericalArtifactPayload } from "@workspace/api-client-react";
+import {
+  useGetJob,
+  getGetJobQueryKey,
+  useRetryJob,
+  getListJobsQueryKey,
+  getGetJobStatsQueryKey,
+  CutoffArtifactPayload,
+  InnoculationArtifactPayload,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMode } from "@/lib/mode-context";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Copy, RotateCw, AlertTriangle, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { DaemonChat } from "@/components/daemon-chat";
+
+type Verdict = "pass" | "warn" | "fail";
 
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
-    case 'complete': return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Complete</Badge>;
-    case 'complete_with_warnings': return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Intermediate</Badge>;
-    case 'failed': return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Failed</Badge>;
-    case 'queued': return <Badge variant="outline" className="bg-muted text-muted-foreground border-white/10">Queued</Badge>;
+    case "complete": return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Complete</Badge>;
+    case "complete_with_warnings": return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Intermediate</Badge>;
+    case "failed": return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Failed</Badge>;
+    case "queued": return <Badge variant="outline" className="bg-muted text-muted-foreground border-white/10">Queued</Badge>;
     default: return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 animate-pulse">Running</Badge>;
   }
+}
+
+function VerdictPill({ verdict, label }: { verdict: Verdict; label: string }) {
+  const cls =
+    verdict === "pass"
+      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+      : verdict === "warn"
+        ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+        : "bg-destructive/10 text-destructive border-destructive/20";
+  const Icon = verdict === "pass" ? CheckCircle2 : verdict === "warn" ? AlertTriangle : XCircle;
+  return (
+    <div className={`rounded-md border p-4 ${cls}`} data-testid={`subverdict-${label.toLowerCase()}`}>
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className="w-4 h-4" />
+        <span className="text-xs font-mono uppercase tracking-wider opacity-80">{label}</span>
+      </div>
+      <div className="text-lg font-semibold capitalize">{verdict}</div>
+    </div>
+  );
+}
+
+type IssueLike = {
+  check_id: string;
+  severity: string;
+  message: string;
+  remediation: string;
+};
+
+function IssueCard({ issue }: { issue: IssueLike }) {
+  return (
+    <Card className="bg-card/50 border-white/5" data-testid={`card-issue-${issue.check_id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Badge
+            variant="outline"
+            className={issue.severity === "fail" ? "border-destructive text-destructive" : "border-yellow-500 text-yellow-500"}
+          >
+            {issue.severity.toUpperCase()}
+          </Badge>
+          <span className="font-mono text-xs text-muted-foreground">{issue.check_id}</span>
+        </div>
+        <p className="text-sm font-medium mb-1">{issue.message}</p>
+        <p className="text-sm text-muted-foreground">{issue.remediation}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CutoffPayloadView({ payload, isDev }: { payload: CutoffArtifactPayload; isDev: boolean }) {
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col items-center justify-center p-8 bg-black/20 border border-white/5 rounded-xl">
+        <div className="text-sm text-muted-foreground uppercase tracking-wider mb-2">Estimated Cutoff</div>
+        <div className="text-4xl font-bold font-mono text-primary" data-testid="text-cutoff-estimate">{payload.cutoff_estimate.month}</div>
+        <div className="text-sm text-muted-foreground mt-2 font-mono">
+          95% CI: [{payload.cutoff_estimate.ci_low}, {payload.cutoff_estimate.ci_high}]
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Knowledge Retention by Month</h4>
+        <div className="h-64" data-testid="chart-monthly-aggregates">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={payload.monthly_aggregates}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis dataKey="month" stroke="rgba(255,255,255,0.3)" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="rgba(255,255,255,0.3)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "hsla(var(--card))", borderColor: "hsla(var(--border))", borderRadius: "8px" }}
+                itemStyle={{ color: "hsla(var(--foreground))" }}
+                formatter={(val: number) => [`${(val * 100).toFixed(1)}%`, "Knew Rate"]}
+                labelStyle={{ color: "hsla(var(--muted-foreground))" }}
+              />
+              <Bar dataKey="knew_rate" fill="hsla(var(--primary))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Probe Results</h4>
+          {!isDev && payload.probe_results.length > 5 && (
+            <span className="text-xs text-muted-foreground">Showing 5 of {payload.probe_results.length}</span>
+          )}
+        </div>
+        <div className="overflow-x-auto border border-white/5 rounded-md">
+          <table className="w-full text-sm text-left" data-testid="table-probe-results">
+            <thead className="bg-black/20 text-muted-foreground text-xs uppercase font-mono">
+              <tr>
+                <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3 font-medium">Question</th>
+                <th className="px-4 py-3 font-medium">Model Answer</th>
+                <th className="px-4 py-3 font-medium text-right">Score</th>
+                <th className="px-4 py-3 font-medium text-center">Knew</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {(isDev ? payload.probe_results : payload.probe_results.slice(0, 5)).map((probe, i) => (
+                <tr key={i} className="hover:bg-white/5">
+                  <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{probe.date}</td>
+                  <td className="px-4 py-3 max-w-[200px] truncate" title={probe.question}>{probe.question}</td>
+                  <td className="px-4 py-3 max-w-[200px] truncate text-muted-foreground" title={probe.model_answer}>{probe.model_answer}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-right">{probe.judge_score.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-center">
+                    {probe.judge_score >= 0.5 ?
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Yes</Badge> :
+                      <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">No</Badge>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function JobDetail() {
@@ -36,8 +164,8 @@ export default function JobDetail() {
       refetchInterval: (query) => {
         const status = query.state.data?.status;
         return (status === "queued" || status === "editor_running" || status === "verifying") ? 2500 : false;
-      }
-    }
+      },
+    },
   });
 
   const retryJob = useRetryJob();
@@ -53,7 +181,7 @@ export default function JobDetail() {
       onError: (err: unknown) => {
         const message = err instanceof Error ? err.message : "Unknown error";
         toast({ title: "Retry failed", description: message, variant: "destructive" });
-      }
+      },
     });
   };
 
@@ -83,16 +211,37 @@ export default function JobDetail() {
   }
 
   const { artifact, diagnostics, ...job } = jobInfo;
-  
-  const stepIndex = 
+  const isInnoculation = job.kind === "innoculation";
+  const innocPayload = (isInnoculation && artifact ? artifact.payload : null) as InnoculationArtifactPayload | null;
+
+  const stepIndex =
     job.status === "queued" ? 0 :
     job.status === "editor_running" ? 1 :
     job.status === "verifying" ? 2 :
     3;
 
+  // For innoculation jobs, partition the namespaced issues into per-phase
+  // groups so each sub-verdict card carries its own issue list.
+  const splitIssues = (() => {
+    if (!isInnoculation || !diagnostics) return null;
+    const spectral: IssueLike[] = [];
+    const speculative: IssueLike[] = [];
+    for (const i of diagnostics.issues) {
+      if (i.check_id.startsWith("spectral:")) {
+        spectral.push({ ...i, check_id: i.check_id.slice("spectral:".length) });
+      } else if (i.check_id.startsWith("speculative:")) {
+        speculative.push({ ...i, check_id: i.check_id.slice("speculative:".length) });
+      } else {
+        spectral.push(i);
+      }
+    }
+    return { spectral, speculative };
+  })();
+
+  const kindLabel = job.kind.replace(/_/g, " ");
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto">
-      
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -109,11 +258,11 @@ export default function JobDetail() {
             <div data-testid="status-job">
               <StatusBadge status={job.status} />
             </div>
-            <Badge variant="outline" className="uppercase font-mono tracking-wider">{job.kind.replace('_', ' ')}</Badge>
-            <span className="text-xs text-muted-foreground font-mono"><Clock className="inline w-3 h-3 mr-1"/>{new Date(job.created_at).toLocaleString()}</span>
+            <Badge variant="outline" className="uppercase font-mono tracking-wider">{kindLabel}</Badge>
+            <span className="text-xs text-muted-foreground font-mono"><Clock className="inline w-3 h-3 mr-1" />{new Date(job.created_at).toLocaleString()}</span>
           </div>
         </div>
-        
+
         {(job.status === "failed" || job.status === "complete_with_warnings") && (
           <Button variant="outline" onClick={handleRetry} disabled={retryJob.isPending} data-testid="button-retry-job" className="border-white/10 shrink-0">
             {retryJob.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCw className="w-4 h-4 mr-2" />}
@@ -127,7 +276,7 @@ export default function JobDetail() {
         <CardContent className="p-6">
           <div className="flex items-center justify-between relative">
             <div className="absolute left-0 top-1/2 w-full h-0.5 bg-white/5 -z-10 -translate-y-1/2"></div>
-            
+
             {([
               { key: "queued", label: "queued" },
               { key: "editor", label: "daemon" },
@@ -139,12 +288,12 @@ export default function JobDetail() {
               return (
                 <div key={key} className="flex flex-col items-center gap-2 bg-card/80 px-2" data-testid={`step-${key}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${
-                    failedVerifying ? 'bg-destructive/20 border-destructive text-destructive' :
-                    active ? 'bg-primary/20 border-primary text-primary' : 'bg-background border-white/10 text-muted-foreground'
+                    failedVerifying ? "bg-destructive/20 border-destructive text-destructive" :
+                    active ? "bg-primary/20 border-primary text-primary" : "bg-background border-white/10 text-muted-foreground"
                   }`}>
                     {failedVerifying ? <XCircle className="w-4 h-4" /> : active ? <CheckCircle2 className="w-4 h-4" /> : <div className="w-2 h-2 rounded-full bg-current" />}
                   </div>
-                  <span className={`text-xs uppercase font-mono tracking-wider ${active ? (failedVerifying ? 'text-destructive' : 'text-primary') : 'text-muted-foreground'}`}>
+                  <span className={`text-xs uppercase font-mono tracking-wider ${active ? (failedVerifying ? "text-destructive" : "text-primary") : "text-muted-foreground"}`}>
                     {label}
                   </span>
                 </div>
@@ -163,25 +312,33 @@ export default function JobDetail() {
       {diagnostics && (
         <div className="space-y-4">
           <h3 className="text-xl font-bold tracking-tight">Diagnostics</h3>
-          
+
           <Card className={`border-white/5 backdrop-blur-sm ${
-            diagnostics.verdict === 'pass' ? 'bg-emerald-500/5 border-emerald-500/20' :
-            diagnostics.verdict === 'warn' ? 'bg-yellow-500/5 border-yellow-500/20' :
-            'bg-destructive/5 border-destructive/20'
+            diagnostics.verdict === "pass" ? "bg-emerald-500/5 border-emerald-500/20" :
+            diagnostics.verdict === "warn" ? "bg-yellow-500/5 border-yellow-500/20" :
+            "bg-destructive/5 border-destructive/20"
           }`}>
             <CardContent className="p-4 flex items-start gap-3">
-              {diagnostics.verdict === 'pass' ? <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" /> :
-               diagnostics.verdict === 'warn' ? <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" /> :
-               <XCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />}
+              {diagnostics.verdict === "pass" ? <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" /> :
+                diagnostics.verdict === "warn" ? <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" /> :
+                <XCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />}
               <div>
                 <p className="font-medium text-foreground" data-testid="text-verdict">
-                  {diagnostics.verdict === 'pass' ? 'This run looks healthy. All checks passed.' :
-                   diagnostics.verdict === 'warn' ? 'We caught some warnings. Review them below.' :
-                   'This run failed verification. See the issues below.'}
+                  {diagnostics.verdict === "pass" ? "This innoculation looks healthy. All checks passed." :
+                    diagnostics.verdict === "warn" ? "We caught some warnings. Review them below." :
+                    "This innoculation failed verification. See the issues below."}
                 </p>
               </div>
             </CardContent>
           </Card>
+
+          {/* Per-phase sub-verdict pills (innoculation only) */}
+          {isInnoculation && innocPayload && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <VerdictPill verdict={innocPayload.sub_verdicts.numerical} label="Spectral" />
+              <VerdictPill verdict={innocPayload.sub_verdicts.cutoff_trace} label="Speculative" />
+            </div>
+          )}
 
           {isDev && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -195,25 +352,31 @@ export default function JobDetail() {
             </div>
           )}
 
-          {diagnostics.issues.length > 0 && (
-            <div className="space-y-3">
-              {diagnostics.issues.map((issue, idx) => (
-                <Card key={idx} className="bg-card/50 border-white/5" data-testid={`card-issue-${issue.check_id}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className={issue.severity === 'fail' ? 'border-destructive text-destructive' : 'border-yellow-500 text-yellow-500'}>
-                          {issue.severity.toUpperCase()}
-                        </Badge>
-                        <span className="font-mono text-xs text-muted-foreground">{issue.check_id}</span>
-                      </div>
-                    </div>
-                    <p className="text-sm font-medium mb-1">{issue.message}</p>
-                    <p className="text-sm text-muted-foreground">{issue.remediation}</p>
-                  </CardContent>
-                </Card>
-              ))}
+          {splitIssues ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Spectral issues</h4>
+                {splitIssues.spectral.length === 0 ? (
+                  <div className="text-xs text-muted-foreground/60 italic font-mono">— none —</div>
+                ) : (
+                  splitIssues.spectral.map((issue, idx) => <IssueCard key={idx} issue={issue} />)
+                )}
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Speculative issues</h4>
+                {splitIssues.speculative.length === 0 ? (
+                  <div className="text-xs text-muted-foreground/60 italic font-mono">— none —</div>
+                ) : (
+                  splitIssues.speculative.map((issue, idx) => <IssueCard key={idx} issue={issue} />)
+                )}
+              </div>
             </div>
+          ) : (
+            diagnostics.issues.length > 0 && (
+              <div className="space-y-3">
+                {diagnostics.issues.map((issue, idx) => <IssueCard key={idx} issue={issue} />)}
+              </div>
+            )
           )}
         </div>
       )}
@@ -225,13 +388,42 @@ export default function JobDetail() {
             <h3 className="text-xl font-bold tracking-tight">Relic</h3>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-white/10 font-mono">v{artifact.version}</Badge>
-              <Badge variant="outline" className="border-white/10 font-mono" title={artifact.hash}>{artifact.hash.substring(0,8)}...{artifact.hash.substring(artifact.hash.length-8)}</Badge>
+              <Badge variant="outline" className="border-white/10 font-mono" title={artifact.hash}>{artifact.hash.substring(0, 8)}...{artifact.hash.substring(artifact.hash.length - 8)}</Badge>
               {artifact.signed_proof && <Badge variant="outline" className="border-primary/20 text-primary bg-primary/10">Signed</Badge>}
             </div>
           </div>
 
           <Card className="bg-card/50 border-white/5 backdrop-blur-sm overflow-hidden">
-            {job.kind === "numerical" ? (
+            {isInnoculation && innocPayload ? (
+              <CardContent className="p-6">
+                <Tabs defaultValue="speculative" className="w-full">
+                  <TabsList className="bg-black/20">
+                    <TabsTrigger value="speculative" data-testid="tab-relic-speculative">Speculative</TabsTrigger>
+                    <TabsTrigger value="spectral" data-testid="tab-relic-spectral">Spectral</TabsTrigger>
+                    {isDev && <TabsTrigger value="raw" data-testid="tab-relic-raw">Raw</TabsTrigger>}
+                  </TabsList>
+                  <TabsContent value="speculative" className="mt-6">
+                    <CutoffPayloadView payload={innocPayload.cutoff_trace} isDev={isDev} />
+                  </TabsContent>
+                  <TabsContent value="spectral" className="mt-6">
+                    {!isDev ? (
+                      <p className="text-muted-foreground">Spectral phase produced a relic at version {artifact.version}.</p>
+                    ) : (
+                      <pre className="text-xs font-mono bg-black/40 p-4 rounded-md overflow-x-auto text-muted-foreground max-h-[500px]">
+                        {JSON.stringify(innocPayload.numerical, null, 2)}
+                      </pre>
+                    )}
+                  </TabsContent>
+                  {isDev && (
+                    <TabsContent value="raw" className="mt-6">
+                      <pre className="text-xs font-mono bg-black/40 p-4 rounded-md overflow-x-auto text-muted-foreground max-h-[500px]">
+                        {JSON.stringify(artifact.payload, null, 2)}
+                      </pre>
+                    </TabsContent>
+                  )}
+                </Tabs>
+              </CardContent>
+            ) : job.kind === "numerical" ? (
               <CardContent className="p-0">
                 {!isDev ? (
                   <div className="p-6">
@@ -251,85 +443,18 @@ export default function JobDetail() {
                 )}
               </CardContent>
             ) : (
-              <CardContent className="p-6 space-y-8">
-                {/* Cutoff Trace specific UI */}
-                {(() => {
-                  const payload = artifact.payload as CutoffArtifactPayload;
-                  return (
-                    <>
-                      <div className="flex flex-col items-center justify-center p-8 bg-black/20 border border-white/5 rounded-xl">
-                        <div className="text-sm text-muted-foreground uppercase tracking-wider mb-2">Estimated Cutoff</div>
-                        <div className="text-4xl font-bold font-mono text-primary" data-testid="text-cutoff-estimate">{payload.cutoff_estimate.month}</div>
-                        <div className="text-sm text-muted-foreground mt-2 font-mono">
-                          95% CI: [{payload.cutoff_estimate.ci_low}, {payload.cutoff_estimate.ci_high}]
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Knowledge Retention by Month</h4>
-                        <div className="h-64" data-testid="chart-monthly-aggregates">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={payload.monthly_aggregates}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                              <XAxis dataKey="month" stroke="rgba(255,255,255,0.3)" fontSize={12} tickLine={false} axisLine={false} />
-                              <YAxis stroke="rgba(255,255,255,0.3)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} />
-                              <Tooltip 
-                                contentStyle={{ backgroundColor: 'hsla(var(--card))', borderColor: 'hsla(var(--border))', borderRadius: '8px' }}
-                                itemStyle={{ color: 'hsla(var(--foreground))' }}
-                                formatter={(val: number) => [`${(val * 100).toFixed(1)}%`, 'Knew Rate']}
-                                labelStyle={{ color: 'hsla(var(--muted-foreground))' }}
-                              />
-                              <Bar dataKey="knew_rate" fill="hsla(var(--primary))" radius={[4,4,0,0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Probe Results</h4>
-                          {!isDev && payload.probe_results.length > 5 && (
-                            <span className="text-xs text-muted-foreground">Showing 5 of {payload.probe_results.length}</span>
-                          )}
-                        </div>
-                        <div className="overflow-x-auto border border-white/5 rounded-md">
-                          <table className="w-full text-sm text-left" data-testid="table-probe-results">
-                            <thead className="bg-black/20 text-muted-foreground text-xs uppercase font-mono">
-                              <tr>
-                                <th className="px-4 py-3 font-medium">Date</th>
-                                <th className="px-4 py-3 font-medium">Question</th>
-                                <th className="px-4 py-3 font-medium">Model Answer</th>
-                                <th className="px-4 py-3 font-medium text-right">Score</th>
-                                <th className="px-4 py-3 font-medium text-center">Knew</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                              {(isDev ? payload.probe_results : payload.probe_results.slice(0, 5)).map((probe, i) => (
-                                <tr key={i} className="hover:bg-white/5">
-                                  <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{probe.date}</td>
-                                  <td className="px-4 py-3 max-w-[200px] truncate" title={probe.question}>{probe.question}</td>
-                                  <td className="px-4 py-3 max-w-[200px] truncate text-muted-foreground" title={probe.model_answer}>{probe.model_answer}</td>
-                                  <td className="px-4 py-3 font-mono text-xs text-right">{probe.judge_score.toFixed(2)}</td>
-                                  <td className="px-4 py-3 text-center">
-                                    {probe.judge_score >= 0.5 ? 
-                                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Yes</Badge> : 
-                                      <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">No</Badge>}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
+              <CardContent className="p-6">
+                <CutoffPayloadView payload={artifact.payload as CutoffArtifactPayload} isDev={isDev} />
               </CardContent>
             )}
           </Card>
         </div>
       )}
 
+      {/* Daemon chat — innoculation relics only */}
+      {isInnoculation && artifact && job.status !== "queued" && job.status !== "editor_running" && job.status !== "verifying" && (
+        <DaemonChat jobId={job.id} />
+      )}
     </div>
   );
 }

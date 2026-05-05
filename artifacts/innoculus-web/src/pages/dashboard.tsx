@@ -2,7 +2,7 @@ import { useGetJobStats, getGetJobStatsQueryKey, useListJobs, getListJobsQueryKe
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { ArrowRight, BarChart3, Activity, AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ArrowRight, Activity, CheckCircle2, FileBox } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 function StatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: any, description?: string }) {
@@ -35,8 +35,11 @@ export default function Dashboard() {
     query: { queryKey: getGetJobStatsQueryKey(), refetchInterval: 5000 }
   });
 
-  const { data: jobsResponse, isLoading: jobsLoading } = useListJobs({ page: 1, page_size: 5 }, {
-    query: { queryKey: getListJobsQueryKey({ page: 1, page_size: 5 }), refetchInterval: 5000 }
+  // Hide legacy single-kind jobs from at-a-glance views — only the unified
+  // `innoculation` runs are surfaced. Direct URLs still work for old jobs.
+  const listParams = { page: 1, page_size: 5, kind: "innoculation" as const };
+  const { data: jobsResponse, isLoading: jobsLoading } = useListJobs(listParams, {
+    query: { queryKey: getListJobsQueryKey(listParams), refetchInterval: 5000 }
   });
 
   return (
@@ -50,28 +53,24 @@ export default function Dashboard() {
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-xl bg-card/50" />)}
         </div>
       ) : stats ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard 
-            title="Total Innoculants" 
-            value={stats.total} 
-            icon={Activity} 
-            description={`${stats.recent_24h} in last 24h`} 
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCard
+            title="Total Innoculations"
+            value={stats.total}
+            icon={Activity}
+            description={`${stats.recent_24h} in last 24h`}
           />
-          <StatCard 
-            title="Pass Rate" 
-            value={stats.total > 0 ? `${Math.round(((stats.by_verdict?.pass || 0) / (stats.by_verdict?.pass + stats.by_verdict?.fail + stats.by_verdict?.warn || 1)) * 100)}%` : '-'} 
-            icon={CheckCircle2} 
+          <StatCard
+            title="Pass Rate"
+            value={stats.total > 0 ? `${Math.round(((stats.by_verdict?.pass || 0) / (stats.by_verdict?.pass + stats.by_verdict?.fail + stats.by_verdict?.warn || 1)) * 100)}%` : '-'}
+            icon={CheckCircle2}
             description={`${stats.by_verdict?.pass || 0} passed`}
           />
-          <StatCard 
-            title="Spectral Innoculants" 
-            value={stats.by_kind?.numerical || 0} 
-            icon={BarChart3} 
-          />
-          <StatCard 
-            title="Speculative Innoculants" 
-            value={stats.by_kind?.cutoff_trace || 0} 
-            icon={Clock} 
+          <StatCard
+            title="Innoculation Relics"
+            value={stats.by_kind?.innoculation || 0}
+            icon={FileBox}
+            description="Unified Spectral + Speculative"
           />
         </div>
       ) : null}
@@ -98,7 +97,7 @@ export default function Dashboard() {
                     <StatusBadge status={job.status} />
                     <div>
                       <div className="font-mono text-sm font-medium text-foreground">{job.id.split('-')[0]}</div>
-                      <div className="text-xs text-muted-foreground mt-1 capitalize">{job.kind === 'cutoff_trace' ? 'speculative' : 'spectral'}</div>
+                      <div className="text-xs text-muted-foreground mt-1 font-mono uppercase tracking-wide">innoculation</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 text-right">

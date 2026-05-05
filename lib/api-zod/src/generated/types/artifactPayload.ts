@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { CutoffArtifactPayload } from "./cutoffArtifactPayload";
+import type { InnoculationArtifactPayload } from "./innoculationArtifactPayload";
 import type { NumericalArtifactPayload } from "./numericalArtifactPayload";
 
-export type ArtifactPayload = NumericalArtifactPayload | CutoffArtifactPayload;
+export type ArtifactPayload =
+  | NumericalArtifactPayload
+  | CutoffArtifactPayload
+  | InnoculationArtifactPayload;

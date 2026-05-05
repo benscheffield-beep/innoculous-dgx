@@ -56,10 +56,37 @@ export interface CutoffArtifactPayload {
   cutoff_estimate: CutoffEstimate;
 }
 
-export type ArtifactPayload = NumericalArtifactPayload | CutoffArtifactPayload;
+export type Verdict = "pass" | "warn" | "fail";
+
+/**
+ * Unified relic produced by an `innoculation` job. Carries both sub-payloads
+ * (Spectral + Speculative) plus a unified verdict and per-phase sub-verdicts.
+ * The Daemon chat surface is conditioned on this payload.
+ */
+export interface InnoculationArtifactPayload {
+  kind: "innoculation";
+  verdict: Verdict;
+  sub_verdicts: {
+    numerical: Verdict;
+    cutoff_trace: Verdict;
+  };
+  numerical: NumericalArtifactPayload;
+  cutoff_trace: CutoffArtifactPayload;
+}
+
+export type ArtifactPayload =
+  | NumericalArtifactPayload
+  | CutoffArtifactPayload
+  | InnoculationArtifactPayload;
 
 export function isCutoffArtifact(p: ArtifactPayload): p is CutoffArtifactPayload {
   return (p as { kind?: string }).kind === "cutoff_trace";
+}
+
+export function isInnoculationArtifact(
+  p: ArtifactPayload,
+): p is InnoculationArtifactPayload {
+  return (p as { kind?: string }).kind === "innoculation";
 }
 
 export const jobArtifactsTable = pgTable("job_artifacts", {

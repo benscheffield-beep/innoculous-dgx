@@ -33,8 +33,10 @@ export default function Jobs() {
   const [page, setPage] = useState(1);
   const pageSize = 30;
 
-  const { data, isLoading } = useListJobs({ page, page_size: pageSize }, {
-    query: { queryKey: getListJobsQueryKey({ page, page_size: pageSize }), refetchInterval: 10000 }
+  // Hide legacy single-kind jobs from the list. Old direct URLs still resolve.
+  const listParams = { page, page_size: pageSize, kind: "innoculation" as const };
+  const { data, isLoading } = useListJobs(listParams, {
+    query: { queryKey: getListJobsQueryKey(listParams), refetchInterval: 10000 }
   });
 
   const grouped: Record<Verdict, NonNullable<typeof data>['jobs']> = {
@@ -100,7 +102,7 @@ export default function Jobs() {
                           </div>
                           <div className="flex items-center gap-2 mt-2">
                             <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded font-mono uppercase tracking-wide">
-                              {job.kind === 'cutoff_trace' ? 'speculative' : 'spectral'}
+                              innoculation
                             </span>
                             {job.retry_count > 0 && (
                               <span className="text-[10px] text-yellow-500/80 flex items-center gap-1">

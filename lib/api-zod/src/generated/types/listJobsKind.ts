@@ -6,12 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
-/**
- * Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.
- */
-export type JobKind = (typeof JobKind)[keyof typeof JobKind];
+export type ListJobsKind = (typeof ListJobsKind)[keyof typeof ListJobsKind];
 
-export const JobKind = {
+export const ListJobsKind = {
   numerical: "numerical",
   cutoff_trace: "cutoff_trace",
   innoculation: "innoculation",

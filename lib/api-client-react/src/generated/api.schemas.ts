@@ -134,9 +134,52 @@ export interface CreateCutoffTraceJobRequest {
   policy_config?: PolicyConfig;
 }
 
+export type CreateInnoculationJobRequestKind =
+  (typeof CreateInnoculationJobRequestKind)[keyof typeof CreateInnoculationJobRequestKind];
+
+export const CreateInnoculationJobRequestKind = {
+  innoculation: "innoculation",
+} as const;
+
+export type CreateInnoculationJobRequestNumericalModelPoolItem = {
+  [key: string]: unknown;
+};
+
+export type CreateInnoculationJobRequestNumerical = {
+  kernel: KernelParams;
+  Q: number[][];
+  truncation: TruncationParams;
+  latency: LatencyParams;
+  precision: PrecisionConfig;
+  model_pool?: CreateInnoculationJobRequestNumericalModelPoolItem[];
+};
+
+export type CreateInnoculationJobRequestCutoffTrace = {
+  model: string;
+  judge_model: string;
+  judge_temperature?: number;
+  /** @minItems 1 */
+  probes: CutoffProbe[];
+};
+
+/**
+ * Unified Innoculation job. Runs both the Spectral (numerical) and
+Speculative (cutoff_trace) editors and merges their outputs into
+one relic that the Daemon can be conditioned on.
+
+ */
+export interface CreateInnoculationJobRequest {
+  kind: CreateInnoculationJobRequestKind;
+  job_id?: string;
+  numerical: CreateInnoculationJobRequestNumerical;
+  cutoff_trace: CreateInnoculationJobRequestCutoffTrace;
+  policy_config?: PolicyConfig;
+}
+
 export type CreateJobRequest =
   | CreateNumericalJobRequest
-  | CreateCutoffTraceJobRequest;
+  | CreateCutoffTraceJobRequest
+  | CreateInnoculationJobRequest;
 
 export interface CutoffProbeResult {
   question: string;
@@ -196,16 +239,70 @@ export interface CutoffArtifactPayload {
   cutoff_estimate: CutoffEstimate;
 }
 
-export type ArtifactPayload = NumericalArtifactPayload | CutoffArtifactPayload;
+export type InnoculationArtifactPayloadKind =
+  (typeof InnoculationArtifactPayloadKind)[keyof typeof InnoculationArtifactPayloadKind];
+
+export const InnoculationArtifactPayloadKind = {
+  innoculation: "innoculation",
+} as const;
+
+export type InnoculationArtifactPayloadVerdict =
+  (typeof InnoculationArtifactPayloadVerdict)[keyof typeof InnoculationArtifactPayloadVerdict];
+
+export const InnoculationArtifactPayloadVerdict = {
+  pass: "pass",
+  warn: "warn",
+  fail: "fail",
+} as const;
+
+export type InnoculationArtifactPayloadSubVerdictsNumerical =
+  (typeof InnoculationArtifactPayloadSubVerdictsNumerical)[keyof typeof InnoculationArtifactPayloadSubVerdictsNumerical];
+
+export const InnoculationArtifactPayloadSubVerdictsNumerical = {
+  pass: "pass",
+  warn: "warn",
+  fail: "fail",
+} as const;
+
+export type InnoculationArtifactPayloadSubVerdictsCutoffTrace =
+  (typeof InnoculationArtifactPayloadSubVerdictsCutoffTrace)[keyof typeof InnoculationArtifactPayloadSubVerdictsCutoffTrace];
+
+export const InnoculationArtifactPayloadSubVerdictsCutoffTrace = {
+  pass: "pass",
+  warn: "warn",
+  fail: "fail",
+} as const;
+
+export type InnoculationArtifactPayloadSubVerdicts = {
+  numerical: InnoculationArtifactPayloadSubVerdictsNumerical;
+  cutoff_trace: InnoculationArtifactPayloadSubVerdictsCutoffTrace;
+};
 
 /**
- * Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.
+ * Unified relic carrying both Spectral and Speculative sub-payloads plus a unified verdict and per-phase sub-verdicts.
+ */
+export interface InnoculationArtifactPayload {
+  kind: InnoculationArtifactPayloadKind;
+  verdict: InnoculationArtifactPayloadVerdict;
+  sub_verdicts: InnoculationArtifactPayloadSubVerdicts;
+  numerical: NumericalArtifactPayload;
+  cutoff_trace: CutoffArtifactPayload;
+}
+
+export type ArtifactPayload =
+  | NumericalArtifactPayload
+  | CutoffArtifactPayload
+  | InnoculationArtifactPayload;
+
+/**
+ * Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.
  */
 export type JobKind = (typeof JobKind)[keyof typeof JobKind];
 
 export const JobKind = {
   numerical: "numerical",
   cutoff_trace: "cutoff_trace",
+  innoculation: "innoculation",
 } as const;
 
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
@@ -228,7 +325,7 @@ export type JobPolicyConfig = { [key: string]: unknown };
 
 export interface Job {
   id: string;
-  /** Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing. */
+  /** Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic. */
   kind: JobKind;
   status: JobStatus;
   /** Job descriptor (numerical kernel params, or cutoff_trace probe specification). */
@@ -373,6 +470,31 @@ export interface DispatchVerifyRequest {
   diagnostics?: DispatchVerifyRequestDiagnostics;
 }
 
+export type DaemonChatMessageRole =
+  (typeof DaemonChatMessageRole)[keyof typeof DaemonChatMessageRole];
+
+export const DaemonChatMessageRole = {
+  user: "user",
+  assistant: "assistant",
+} as const;
+
+export interface DaemonChatMessage {
+  role: DaemonChatMessageRole;
+  content: string;
+}
+
+export interface DaemonChatRequest {
+  /** @minItems 1 */
+  messages: DaemonChatMessage[];
+  /** Optional override of the Daemon model. Defaults to the server's configured model. */
+  model?: string;
+}
+
+export interface DaemonChatResponse {
+  content: string;
+  model: string;
+}
+
 export type PostVerdictRequestVerdict =
   (typeof PostVerdictRequestVerdict)[keyof typeof PostVerdictRequestVerdict];
 
@@ -394,4 +516,16 @@ export interface PostVerdictRequest {
 export type ListJobsParams = {
   page?: number;
   page_size?: number;
+  /**
+   * Optional. When provided, only jobs of this kind are returned.
+   */
+  kind?: ListJobsKind;
 };
+
+export type ListJobsKind = (typeof ListJobsKind)[keyof typeof ListJobsKind];
+
+export const ListJobsKind = {
+  numerical: "numerical",
+  cutoff_trace: "cutoff_trace",
+  innoculation: "innoculation",
+} as const;

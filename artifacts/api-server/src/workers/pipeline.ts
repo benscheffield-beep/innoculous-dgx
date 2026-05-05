@@ -5,12 +5,15 @@ import {
   jobArtifactsTable,
   jobDiagnosticsTable,
   isCutoffArtifact,
+  isInnoculationArtifact,
   type JobDescriptor,
   type NumericalDescriptor,
   type CutoffTraceDescriptor,
+  type InnoculationDescriptor,
   type ArtifactPayload,
   type CutoffArtifactPayload,
   type NumericalArtifactPayload,
+  type InnoculationArtifactPayload,
 } from "@workspace/db";
 import { runEditor } from "./editor.js";
 import { runVerifier, type PolicyConfig as VerifierPolicy, type Verdict, computeArtifactHash } from "./verifier.js";
@@ -113,6 +116,98 @@ function applyRemediation(
   return { descriptor: d, changed };
 }
 
+function worstVerdict(a: Verdict, b: Verdict): Verdict {
+  if (a === "fail" || b === "fail") return "fail";
+  if (a === "warn" || b === "warn") return "warn";
+  return "pass";
+}
+
+function collectInnoculationIssues(p: InnoculationArtifactPayload): DiagnosticIssue[] {
+  // Namespace each sub-issue so the UI can attribute it to the right phase.
+  const tag = (phase: "spectral" | "speculative") => (i: DiagnosticIssue): DiagnosticIssue => ({
+    ...i,
+    check_id: `${phase}:${i.check_id}`,
+  });
+  const numIssues = ((p.numerical.diagnostics as { issues?: DiagnosticIssue[] })?.issues ?? []).map(
+    tag("spectral"),
+  );
+  const ctIssues = (
+    ((p.cutoff_trace as unknown) as { issues?: DiagnosticIssue[] }).issues ?? []
+  ).map(tag("speculative"));
+  return [...numIssues, ...ctIssues];
+}
+
+/**
+ * Runs the Spectral and Speculative editors+verifiers in parallel, then folds
+ * their outputs into a single `innoculation` relic. The unified verdict is
+ * the worst of the two sub-verdicts. We do NOT remediate-and-retry inside
+ * this cycle — each phase has its own remediation universe and combining them
+ * cleanly is out of scope for the merged pipeline.
+ */
+async function runInnoculationCycle(
+  descriptor: InnoculationDescriptor,
+  policy: Partial<VerifierPolicy>,
+): Promise<InnoculationArtifactPayload> {
+  const numDescriptor: NumericalDescriptor = {
+    kind: "numerical",
+    ...descriptor.numerical,
+  };
+  const ctDescriptor: CutoffTraceDescriptor = {
+    kind: "cutoff_trace",
+    ...descriptor.cutoff_trace,
+  };
+
+  const [numRes, ctRes] = await Promise.all([
+    runEditor(numDescriptor),
+    runCutoffEditor(ctDescriptor),
+  ]);
+
+  const numHash = computeArtifactHash(numRes.artifact);
+  const ctHash = computeArtifactHash(ctRes.artifact);
+
+  const pc = policy as {
+    judge_disagreement_max?: number;
+    min_probes_per_month?: number;
+    min_recheck_count?: number;
+  };
+
+  const [numVerify, ctVerify] = await Promise.all([
+    runVerifier(numRes.artifact, numHash, policy),
+    runCutoffVerifier(ctRes.artifact, ctHash, {
+      policy: {
+        ...(pc.judge_disagreement_max !== undefined ? { judge_disagreement_max: pc.judge_disagreement_max } : {}),
+        ...(pc.min_probes_per_month !== undefined ? { min_probes_per_month: pc.min_probes_per_month } : {}),
+        ...(pc.min_recheck_count !== undefined ? { min_recheck_count: pc.min_recheck_count } : {}),
+      },
+    }),
+  ]);
+
+  // Stamp issues onto each sub-payload so the merged payload's diagnostics
+  // carry per-phase attribution without a separate side table.
+  const numWithIssues: NumericalArtifactPayload = {
+    ...numRes.artifact,
+    diagnostics: {
+      ...numRes.artifact.diagnostics,
+      ...({ issues: numVerify.issues } as Record<string, unknown>),
+    } as NumericalArtifactPayload["diagnostics"],
+  };
+  const ctWithIssues = {
+    ...ctRes.artifact,
+    issues: ctVerify.issues,
+  } as CutoffArtifactPayload;
+
+  return {
+    kind: "innoculation",
+    verdict: worstVerdict(numVerify.verdict, ctVerify.verdict),
+    sub_verdicts: {
+      numerical: numVerify.verdict,
+      cutoff_trace: ctVerify.verdict,
+    },
+    numerical: numWithIssues,
+    cutoff_trace: ctWithIssues,
+  };
+}
+
 async function runEditorVerifierCycle(
   jobId: string,
   descriptor: JobDescriptor,
@@ -129,7 +224,10 @@ async function runEditorVerifierCycle(
   }
 
   let artifact: ArtifactPayload;
-  if ((descriptor as CutoffTraceDescriptor).kind === "cutoff_trace") {
+  const dKind = (descriptor as { kind?: string }).kind;
+  if (dKind === "innoculation") {
+    artifact = await runInnoculationCycle(descriptor as InnoculationDescriptor, policy);
+  } else if (dKind === "cutoff_trace") {
     const r = await runCutoffEditor(descriptor as CutoffTraceDescriptor);
     artifact = r.artifact;
   } else {
@@ -157,7 +255,25 @@ async function runEditorVerifierCycle(
   let signed_proof: string;
   let diagInsert: typeof jobDiagnosticsTable.$inferInsert;
 
-  if (isCutoffArtifact(artifact)) {
+  if (isInnoculationArtifact(artifact)) {
+    const innoc = artifact;
+    verdict = innoc.verdict;
+    issues = collectInnoculationIssues(innoc);
+    signed_proof = `innoculation:${hash}`;
+    // Store the merged numerical sub-payload's flat metrics in the diagnostics
+    // row so existing diagnostics-based dashboards keep working. The full
+    // sub-payload data lives in the artifact payload itself.
+    diagInsert = {
+      jobId,
+      artifactId: insertedArtifact.id,
+      spectralRadius: innoc.numerical.diagnostics.spectral_radius,
+      condIMinusG: innoc.numerical.diagnostics.cond_I_minus_G,
+      dualTruncationError: innoc.numerical.diagnostics.dual_truncation_error,
+      spectralTailError: innoc.numerical.diagnostics.spectral_tail_error,
+      verdict,
+      issues,
+    };
+  } else if (isCutoffArtifact(artifact)) {
     const cutoffPayload: CutoffArtifactPayload = artifact;
     const pc = policy as {
       judge_disagreement_max?: number;
@@ -273,6 +389,13 @@ export async function runPipeline(jobId: string): Promise<void> {
       );
 
       if (result.verdict === "pass" || result.verdict === "warn") {
+        break;
+      }
+
+      // Innoculation jobs do not auto-remediate: each phase has its own
+      // remediation universe and the user explicitly opted into the merged
+      // pipeline. Surface the failure verdict directly.
+      if ((descriptor as { kind?: string }).kind === "innoculation") {
         break;
       }
 

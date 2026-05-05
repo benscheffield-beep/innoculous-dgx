@@ -62,7 +62,7 @@ paths:
       operationId: listJobs
       tags: [jobs]
       summary: List all jobs
-      description: Returns a paginated list of all jobs
+      description: Returns a paginated list of all jobs. Use `kind` to filter to a single job kind (e.g. only `innoculation` for the modern UI).
       parameters:
         - name: page
           in: query
@@ -74,6 +74,13 @@ paths:
           schema:
             type: integer
             default: 20
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [numerical, cutoff_trace, innoculation]
+          description: Optional. When provided, only jobs of this kind are returned.
       responses:
         "200":
           description: Paginated job list
@@ -293,6 +300,48 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /jobs/{id}/daemon/messages:
+    post:
+      operationId: chatWithDaemon
+      tags: [jobs]
+      summary: Send a chat turn to the relic's Daemon
+      description: |
+        The Daemon is an LLM persona conditioned on the relic produced by an
+        `innoculation` job (Spectral + Speculative outputs). Stateless: clients
+        send the full message history every call; nothing is persisted server-side.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DaemonChatRequest"
+      responses:
+        "200":
+          description: Assistant reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DaemonChatResponse"
+        "400":
+          description: Invalid request or job has no relic yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /jobs/stats:
     get:
       operationId: getJobStats
@@ -416,8 +465,65 @@ components:
       oneOf:
         - $ref: "#/components/schemas/CreateNumericalJobRequest"
         - $ref: "#/components/schemas/CreateCutoffTraceJobRequest"
+        - $ref: "#/components/schemas/CreateInnoculationJobRequest"
       discriminator:
         propertyName: kind
+
+    CreateInnoculationJobRequest:
+      type: object
+      description: |
+        Unified Innoculation job. Runs both the Spectral (numerical) and
+        Speculative (cutoff_trace) editors and merges their outputs into
+        one relic that the Daemon can be conditioned on.
+      properties:
+        kind:
+          type: string
+          enum: [innoculation]
+        job_id:
+          type: string
+          format: uuid
+        numerical:
+          type: object
+          properties:
+            kernel:
+              $ref: "#/components/schemas/KernelParams"
+            Q:
+              type: array
+              items:
+                type: array
+                items:
+                  type: number
+            truncation:
+              $ref: "#/components/schemas/TruncationParams"
+            latency:
+              $ref: "#/components/schemas/LatencyParams"
+            precision:
+              $ref: "#/components/schemas/PrecisionConfig"
+            model_pool:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+          required: [kernel, Q, truncation, latency, precision]
+        cutoff_trace:
+          type: object
+          properties:
+            model:
+              type: string
+            judge_model:
+              type: string
+            judge_temperature:
+              type: number
+              default: 0
+            probes:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/components/schemas/CutoffProbe"
+          required: [model, judge_model, probes]
+        policy_config:
+          $ref: "#/components/schemas/PolicyConfig"
+      required: [kind, numerical, cutoff_trace]
 
     CreateNumericalJobRequest:
       type: object
@@ -558,10 +664,37 @@ components:
           $ref: "#/components/schemas/CutoffEstimate"
       required: [kind, model, judge_model, probe_results, monthly_aggregates, cutoff_estimate]
 
+    InnoculationArtifactPayload:
+      type: object
+      description: Unified relic carrying both Spectral and Speculative sub-payloads plus a unified verdict and per-phase sub-verdicts.
+      properties:
+        kind:
+          type: string
+          enum: [innoculation]
+        verdict:
+          type: string
+          enum: [pass, warn, fail]
+        sub_verdicts:
+          type: object
+          properties:
+            numerical:
+              type: string
+              enum: [pass, warn, fail]
+            cutoff_trace:
+              type: string
+              enum: [pass, warn, fail]
+          required: [numerical, cutoff_trace]
+        numerical:
+          $ref: "#/components/schemas/NumericalArtifactPayload"
+        cutoff_trace:
+          $ref: "#/components/schemas/CutoffArtifactPayload"
+      required: [kind, verdict, sub_verdicts, numerical, cutoff_trace]
+
     ArtifactPayload:
       oneOf:
         - $ref: "#/components/schemas/NumericalArtifactPayload"
         - $ref: "#/components/schemas/CutoffArtifactPayload"
+        - $ref: "#/components/schemas/InnoculationArtifactPayload"
       discriminator:
         propertyName: kind
 
@@ -573,8 +706,8 @@ components:
           format: uuid
         kind:
           type: string
-          enum: [numerical, cutoff_trace]
-          description: Job kind. numerical = original Editor pipeline; cutoff_trace = LLM knowledge-cutoff probing.
+          enum: [numerical, cutoff_trace, innoculation]
+          description: Job kind. numerical = legacy Spectral pipeline; cutoff_trace = legacy Speculative pipeline; innoculation = unified pipeline producing one merged relic.
         status:
           type: string
           enum: [queued, editor_running, verifying, complete, complete_with_warnings, failed]
@@ -778,6 +911,38 @@ components:
           type: object
           additionalProperties: true
       required: [artifact_id]
+
+    DaemonChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+      required: [role, content]
+
+    DaemonChatRequest:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DaemonChatMessage"
+          minItems: 1
+        model:
+          type: string
+          description: Optional override of the Daemon model. Defaults to the server's configured model.
+      required: [messages]
+
+    DaemonChatResponse:
+      type: object
+      properties:
+        content:
+          type: string
+        model:
+          type: string
+      required: [content, model]
 
     PostVerdictRequest:
       type: object

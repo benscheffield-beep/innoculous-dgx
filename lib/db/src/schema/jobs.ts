@@ -10,7 +10,7 @@ export type JobStatus =
   | "complete_with_warnings"
   | "failed";
 
-export type JobKind = "numerical" | "cutoff_trace";
+export type JobKind = "numerical" | "cutoff_trace" | "innoculation";
 
 export interface KernelParams {
   type: "gaussian" | "mellin";
@@ -58,7 +58,22 @@ export interface CutoffTraceDescriptor {
   seed?: number;
 }
 
-export type JobDescriptor = NumericalDescriptor | CutoffTraceDescriptor;
+/**
+ * A unified innoculation runs both the Spectral (numerical) and Speculative
+ * (cutoff_trace) sub-pipelines and merges their outputs into a single relic.
+ * Both sub-descriptors are required.
+ */
+export interface InnoculationDescriptor {
+  kind: "innoculation";
+  numerical: Omit<NumericalDescriptor, "kind">;
+  cutoff_trace: Omit<CutoffTraceDescriptor, "kind">;
+  seed?: number;
+}
+
+export type JobDescriptor =
+  | NumericalDescriptor
+  | CutoffTraceDescriptor
+  | InnoculationDescriptor;
 
 export const jobsTable = pgTable("jobs", {
   id: uuid("id").primaryKey().defaultRandom(),

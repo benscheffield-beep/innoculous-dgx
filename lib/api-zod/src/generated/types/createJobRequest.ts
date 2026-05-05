@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { CreateCutoffTraceJobRequest } from "./createCutoffTraceJobRequest";
+import type { CreateInnoculationJobRequest } from "./createInnoculationJobRequest";
 import type { CreateNumericalJobRequest } from "./createNumericalJobRequest";
 
 export type CreateJobRequest =
   | CreateNumericalJobRequest
-  | CreateCutoffTraceJobRequest;
+  | CreateCutoffTraceJobRequest
+  | CreateInnoculationJobRequest;

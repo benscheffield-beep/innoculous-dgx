@@ -5,8 +5,13 @@
  * Innoculus API specification — Manager / Editor / Verifier pipeline
  * OpenAPI spec version: 0.2.0
  */
+import type { ListJobsKind } from "./listJobsKind";
 
 export type ListJobsParams = {
   page?: number;
   page_size?: number;
+  /**
+   * Optional. When provided, only jobs of this kind are returned.
+   */
+  kind?: ListJobsKind;
 };

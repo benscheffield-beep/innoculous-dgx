@@ -18,6 +18,8 @@ import type {
 
 import type {
   CreateJobRequest,
+  DaemonChatRequest,
+  DaemonChatResponse,
   DispatchVerifyRequest,
   DispatchWorkRequest,
   ErrorResponse,
@@ -206,7 +208,7 @@ export const useCreateJob = <
 };
 
 /**
- * Returns a paginated list of all jobs
+ * Returns a paginated list of all jobs. Use `kind` to filter to a single job kind (e.g. only `innoculation` for the modern UI).
  * @summary List all jobs
  */
 export const getListJobsUrl = (params?: ListJobsParams) => {
@@ -899,6 +901,97 @@ export const useRetryJob = <
   TContext
 > => {
   return useMutation(getRetryJobMutationOptions(options));
+};
+
+/**
+ * The Daemon is an LLM persona conditioned on the relic produced by an
+`innoculation` job (Spectral + Speculative outputs). Stateless: clients
+send the full message history every call; nothing is persisted server-side.
+
+ * @summary Send a chat turn to the relic's Daemon
+ */
+export const getChatWithDaemonUrl = (id: string) => {
+  return `/api/jobs/${id}/daemon/messages`;
+};
+
+export const chatWithDaemon = async (
+  id: string,
+  daemonChatRequest: DaemonChatRequest,
+  options?: RequestInit,
+): Promise<DaemonChatResponse> => {
+  return customFetch<DaemonChatResponse>(getChatWithDaemonUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(daemonChatRequest),
+  });
+};
+
+export const getChatWithDaemonMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof chatWithDaemon>>,
+    TError,
+    { id: string; data: BodyType<DaemonChatRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof chatWithDaemon>>,
+  TError,
+  { id: string; data: BodyType<DaemonChatRequest> },
+  TContext
+> => {
+  const mutationKey = ["chatWithDaemon"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof chatWithDaemon>>,
+    { id: string; data: BodyType<DaemonChatRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return chatWithDaemon(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ChatWithDaemonMutationResult = NonNullable<
+  Awaited<ReturnType<typeof chatWithDaemon>>
+>;
+export type ChatWithDaemonMutationBody = BodyType<DaemonChatRequest>;
+export type ChatWithDaemonMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Send a chat turn to the relic's Daemon
+ */
+export const useChatWithDaemon = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof chatWithDaemon>>,
+    TError,
+    { id: string; data: BodyType<DaemonChatRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof chatWithDaemon>>,
+  TError,
+  { id: string; data: BodyType<DaemonChatRequest> },
+  TContext
+> => {
+  return useMutation(getChatWithDaemonMutationOptions(options));
 };
 
 /**
