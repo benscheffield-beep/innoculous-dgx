@@ -454,6 +454,30 @@ export default function Splash() {
     onMouseLeave: () => setHovered((h) => (h === key ? null : h)),
   });
 
+  // Per-comet style helper. When the Daemon chat is closed (unprompted),
+  // every comet shares the same 6s period and zero phase offset, so the
+  // diagram reads as a single, synchronous breath. The moment the user
+  // opens the Daemon chat ("permitted conversation") we stagger durations
+  // and seed each comet with a different negative animation-delay — this
+  // immediately desynchronises the lattice without waiting for the next
+  // cycle, giving the icon a livelier, conversational randomness.
+  // Note: we only override animation-duration / -delay; the direction
+  // (forward vs. reverse) stays fixed to whatever the className specifies.
+  const cometStyle = (i: number): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      strokeDasharray: "4 100",
+      filter: "url(#ic-soft-glow)",
+    };
+    if (!chatOpen) return base;
+    const durations = [5.3, 7.1, 4.7, 8.2, 6.6, 5.1, 7.8, 4.4];
+    const delays    = [  0, -2.3, -1.1, -3.7, -0.5, -2.9, -4.2, -1.6];
+    return {
+      ...base,
+      animationDuration: `${durations[i]}s`,
+      animationDelay: `${delays[i]}s`,
+    };
+  };
+
   return (
     <div
       className="relative min-h-[100dvh] w-full overflow-hidden flex flex-col items-center justify-center font-sans"
@@ -548,7 +572,7 @@ export default function Splash() {
             strokeLinecap="round"
             pathLength={100}
             className="animate-[innoculus-comet_6s_linear_infinite]"
-            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+            style={cometStyle(0)}
           />
           <path
             d="M 200 60 C 340 220, 340 500, 200 660"
@@ -559,7 +583,7 @@ export default function Splash() {
             strokeLinecap="round"
             pathLength={100}
             className="animate-[innoculus-comet_6s_linear_infinite_reverse]"
-            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+            style={cometStyle(1)}
           />
 
           {/* Vertical telemetry spine */}
@@ -591,7 +615,7 @@ export default function Splash() {
             strokeLinecap="round"
             pathLength={100}
             className="animate-[innoculus-comet_6s_linear_infinite]"
-            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+            style={cometStyle(2)}
           />
           <path
             d="M 200 80 C 270 160, 270 280, 200 360"
@@ -611,7 +635,7 @@ export default function Splash() {
             strokeLinecap="round"
             pathLength={100}
             className="animate-[innoculus-comet_6s_linear_infinite_reverse]"
-            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+            style={cometStyle(3)}
           />
 
           {/* Lower inner lens — same comet highlight pass; directions
@@ -635,7 +659,7 @@ export default function Splash() {
             strokeLinecap="round"
             pathLength={100}
             className="animate-[innoculus-comet_6s_linear_infinite_reverse]"
-            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+            style={cometStyle(4)}
           />
           <path
             d="M 200 360 C 270 440, 270 560, 200 640"
@@ -655,7 +679,7 @@ export default function Splash() {
             strokeLinecap="round"
             pathLength={100}
             className="animate-[innoculus-comet_6s_linear_infinite]"
-            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+            style={cometStyle(5)}
           />
 
           {/* Innermost oval — solid base */}
@@ -685,7 +709,7 @@ export default function Splash() {
             strokeLinecap="round"
             pathLength={100}
             className="animate-[innoculus-comet_6s_linear_infinite_reverse]"
-            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+            style={cometStyle(6)}
           />
           <path
             d="M 200 220 C 255 290, 255 430, 200 500"
@@ -696,7 +720,7 @@ export default function Splash() {
             strokeLinecap="round"
             pathLength={100}
             className="animate-[innoculus-comet_6s_linear_infinite]"
-            style={{ strokeDasharray: "4 100", filter: "url(#ic-soft-glow)" }}
+            style={cometStyle(7)}
           />
 
           {/* Interior nodes — silicon grey body, white halo. Each speaks its
