@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { ArrowRight, Brain, Edit3, ShieldCheck, FileBox, List, BarChart3, Clock } from "lucide-react";
+import { ArrowRight, Brain, Edit3, ShieldCheck, FileBox, BarChart3, Clock } from "lucide-react";
 import { InnoculusEmblem } from "@/components/innoculus-emblem";
 
 type MetalTint = "lead" | "copper" | "gold" | "silver";
@@ -217,7 +217,7 @@ export default function Tutorial() {
           <Step num="2" title="Observe">
             The innoculant appears under{" "}
             <Link href="/jobs" className="text-primary hover:underline inline-flex items-center gap-1">
-              <List className="w-3 h-3" /> All Innoculations
+              <span className="inline-flex items-center justify-center w-3 h-3 text-xs leading-none font-serif">Σ</span> All Innoculations
             </Link>
             . Click any row to see its live status — Queued, Daemon Running, Judging,
             then a final verdict.
