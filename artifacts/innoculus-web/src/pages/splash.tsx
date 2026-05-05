@@ -928,12 +928,8 @@ export default function Splash() {
                 <span className="text-red-300/85">
                   The Daemon is silent — {chatError}
                 </span>
-              ) : transcript ? (
-                transcript
               ) : (
-                <span className="text-white/35 italic">
-                  Speak, and the Daemon will answer.
-                </span>
+                transcript
               )}
             </div>
           </div>
