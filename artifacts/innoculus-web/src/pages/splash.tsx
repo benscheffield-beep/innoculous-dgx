@@ -5,11 +5,20 @@ export default function Splash() {
   const [, navigate] = useLocation();
   const [hover, setHover] = useState(false);
 
+  const [hoverTutorial, setHoverTutorial] = useState(false);
+
   const handleEnter = () => navigate("/dashboard");
+  const handleTutorial = () => navigate("/tutorial");
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       handleEnter();
+    }
+  };
+  const onKeyTutorial = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleTutorial();
     }
   };
 
@@ -184,12 +193,27 @@ export default function Splash() {
               style={{ animationDelay: "1.2s" }} />
             <circle cx="200" cy="500" r="6" fill="#e6e9ec" filter="url(#ic-soft-glow)" />
           </g>
-          {/* Bottom node */}
-          <g>
-            <circle cx="200" cy="660" r="14" fill="url(#ic-node-glow-soft)"
+          {/* Bottom node — Tutorial portal */}
+          <g
+            onClick={handleTutorial}
+            onKeyDown={onKeyTutorial}
+            onMouseEnter={() => setHoverTutorial(true)}
+            onMouseLeave={() => setHoverTutorial(false)}
+            tabIndex={0}
+            role="button"
+            aria-label="Open tutorial"
+            data-testid="splash-tutorial"
+            style={{ cursor: "pointer", outline: "none" }}
+          >
+            {/* Generous transparent hit target */}
+            <circle cx="200" cy="660" r="32" fill="transparent" />
+            <circle cx="200" cy="660" r={hoverTutorial ? 20 : 14} fill="url(#ic-node-glow-soft)"
               className="animate-[innoculus-breathe_4.2s_ease-in-out_infinite]"
-              style={{ animationDelay: "2.1s" }} />
-            <circle cx="200" cy="660" r="4" fill="#c0c5cb" filter="url(#ic-soft-glow)" />
+              style={{ animationDelay: "2.1s", transition: "r 280ms ease" }} />
+            <circle cx="200" cy="660" r={hoverTutorial ? 5 : 4}
+              fill={hoverTutorial ? "#ffffff" : "#c0c5cb"}
+              filter="url(#ic-soft-glow)"
+              style={{ transition: "r 280ms ease, fill 280ms ease" }} />
           </g>
 
           {/* TOP NODE — the clickable portal */}
