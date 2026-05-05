@@ -10,6 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
 import JobDetail from "@/pages/job-detail";
 import Submit from "@/pages/submit";
+import Tutorial from "@/pages/tutorial";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,9 @@ function Router() {
       </Route>
       <Route path="/jobs/:id">
         <ShellRoute><JobDetail /></ShellRoute>
+      </Route>
+      <Route path="/tutorial">
+        <ShellRoute><Tutorial /></ShellRoute>
       </Route>
       <Route>
         <ShellRoute><NotFound /></ShellRoute>

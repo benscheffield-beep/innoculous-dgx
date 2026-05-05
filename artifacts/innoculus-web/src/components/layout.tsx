@@ -2,7 +2,7 @@ import type React from "react";
 import { Link, useLocation } from "wouter";
 import { useMode } from "@/lib/mode-context";
 import { useHealthCheck, getHealthCheckQueryKey } from "@workspace/api-client-react";
-import { LayoutDashboard, List, Play, Settings } from "lucide-react";
+import { LayoutDashboard, List, Play, Settings, BookOpen } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { InnoculusEmblem } from "@/components/innoculus-emblem";
@@ -57,6 +57,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Link href="/jobs" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${location.startsWith("/jobs") ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"}`} data-testid="link-nav-jobs">
             <List className="w-4 h-4" />
             <span className="font-medium text-sm">All Jobs</span>
+          </Link>
+          <Link href="/tutorial" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${location === "/tutorial" ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"}`} data-testid="link-nav-tutorial">
+            <BookOpen className="w-4 h-4" />
+            <span className="font-medium text-sm">Tutorial</span>
           </Link>
         </nav>
 
