@@ -113,10 +113,6 @@ export default function Submit() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Initiate Innoculation</h1>
-        <p className="text-muted-foreground mt-2 font-mono text-sm">
-          Supply the probes, the models, and the latency profile. Spectral kernel and
-          tuning parameters are filled in for you with safe defaults.
-        </p>
       </div>
 
       <Card className="bg-card/50 border-white/5 backdrop-blur-sm">
